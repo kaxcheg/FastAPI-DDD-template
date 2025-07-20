@@ -12,9 +12,9 @@ from app.domain.services.services import IdGenerator
 from app.infrastructure.db.sqlalchemy.adapters import UUIDv4Generator, UoWSQL
 from app.infrastructure.db.sqlalchemy.setup import async_session_factory
 from app.infrastructure.security.adapters import BcryptHasher, BcryptPasswordVerifier
-from app.interface.http.adapters.auth import TokenSQLAuthService
+from app.infrastructure.db.sqlalchemy.adapters import TokenSQLAuthService
 
-from app.config.config import settings
+from app.config import settings
 
 security = HTTPBearer()
 
