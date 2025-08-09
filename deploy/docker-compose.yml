@@ -1,0 +1,98 @@
+name: fastapi_ddd_template
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_secret
+      POSTGRES_DB: ${FASTAPI_DDD_TEMPLATE_POSTGRES_DB}
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    secrets:
+    - source: postgres_admin_secret
+      target: postgres_admin_secret
+  db-bootstrap:
+    image: postgres:16
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint:
+    - /bin/bash
+    - -lc
+    - bash /bootstrap/bootstrap_db.sh
+    environment:
+      DB_HOST: db
+      DB_ADMIN: ${POSTGRES_ADMIN}
+      DB_ADMIN_PWD_FILE: /run/secrets/postgres_admin_secret
+      DB_NAME: ${FASTAPI_DDD_TEMPLATE_POSTGRES_DB}
+      DB_USER: ${FASTAPI_DDD_TEMPLATE_POSTGRES_USER}
+      DB_USER_PWD_FILE: /run/secrets/fastapi_ddd_template_postgres_user_secret
+    secrets:
+    - source: postgres_admin_secret
+      target: postgres_admin_secret
+    - source: fastapi_ddd_template_postgres_user_secret
+      target: fastapi_ddd_template_postgres_user_secret
+    volumes:
+    - ./bootstrap:/bootstrap:ro
+  app:
+    image: fastapi_ddd_template_app:0.1.0
+    depends_on:
+      db:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      FASTAPI_DDD_TEMPLATE_APP_ADMIN: ${FASTAPI_DDD_TEMPLATE_APP_ADMIN}
+      FASTAPI_DDD_TEMPLATE_APP_BOOTSTRAP_ADMIN: ${FASTAPI_DDD_TEMPLATE_APP_BOOTSTRAP_ADMIN}
+      FASTAPI_DDD_TEMPLATE_DEBUG: ${FASTAPI_DDD_TEMPLATE_DEBUG}
+      FASTAPI_DDD_TEMPLATE_ENV: ${FASTAPI_DDD_TEMPLATE_ENV}
+      FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: ${FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM}
+      FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: ${FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME}
+      FASTAPI_DDD_TEMPLATE_LOG_DIR: ${FASTAPI_DDD_TEMPLATE_LOG_DIR}
+      FASTAPI_DDD_TEMPLATE_POSTGRES_DB: ${FASTAPI_DDD_TEMPLATE_POSTGRES_DB}
+      FASTAPI_DDD_TEMPLATE_POSTGRES_DRIVER: ${FASTAPI_DDD_TEMPLATE_POSTGRES_DRIVER}
+      FASTAPI_DDD_TEMPLATE_POSTGRES_HOST: ${FASTAPI_DDD_TEMPLATE_POSTGRES_HOST}
+      FASTAPI_DDD_TEMPLATE_POSTGRES_USER: ${FASTAPI_DDD_TEMPLATE_POSTGRES_USER}
+      FASTAPI_DDD_TEMPLATE_UVICORN_HOST: ${FASTAPI_DDD_TEMPLATE_UVICORN_HOST}
+      FASTAPI_DDD_TEMPLATE_UVICORN_PORT: ${FASTAPI_DDD_TEMPLATE_UVICORN_PORT}
+    ports:
+    - ${FASTAPI_DDD_TEMPLATE_UVICORN_PORT}:${FASTAPI_DDD_TEMPLATE_UVICORN_PORT}
+    restart: unless-stopped
+    entrypoint:
+    - python
+    - ./entrypoint.py
+    - --config-fields
+    - ./config_fields.json
+    - uvicorn
+    - app.interface.http.main:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - ${FASTAPI_DDD_TEMPLATE_UVICORN_PORT}
+    secrets:
+    - source: fastapi_ddd_template_app_admin_password_hash
+      target: fastapi_ddd_template_app_admin_password_hash
+    - source: fastapi_ddd_template_jwt_secret
+      target: fastapi_ddd_template_jwt_secret
+    - source: fastapi_ddd_template_postgres_user_secret
+      target: fastapi_ddd_template_postgres_user_secret
+volumes:
+  pgdata: {}
+secrets:
+  postgres_admin_secret:
+    file: ./secrets/postgres_admin_secret
+  fastapi_ddd_template_app_admin_password_hash:
+    file: ./secrets/fastapi_ddd_template_app_admin_password_hash
+  fastapi_ddd_template_jwt_secret:
+    file: ./secrets/fastapi_ddd_template_jwt_secret
+  fastapi_ddd_template_postgres_user_secret:
+    file: ./secrets/fastapi_ddd_template_postgres_user_secret

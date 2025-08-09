@@ -1,0 +1,66 @@
+[
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_APP_ADMIN",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_APP_BOOTSTRAP_ADMIN",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_DEBUG",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_ENV",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_LOG_DIR",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_POSTGRES_DB",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_POSTGRES_DRIVER",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_POSTGRES_HOST",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_POSTGRES_USER",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_UVICORN_HOST",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_UVICORN_PORT",
+        "is_secret": false
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_APP_ADMIN_PASSWORD_HASH",
+        "is_secret": true
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_JWT_SECRET",
+        "is_secret": true
+    },
+    {
+        "name": "FASTAPI_DDD_TEMPLATE_POSTGRES_USER_SECRET",
+        "is_secret": true
+    }
+]

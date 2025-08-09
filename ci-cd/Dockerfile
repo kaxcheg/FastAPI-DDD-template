@@ -1,0 +1,40 @@
+# builder stage; uses own file system
+FROM python:3.12-slim AS builder
+# mkdir -p /app && cd /app (-p creates /app if not exists)
+WORKDIR /app
+# copy pyproject.toml poetry.lock from host to builder ./
+COPY pyproject.toml poetry.lock ./
+RUN pip install --upgrade pip
+# make sure poetry version mathes poetry.lock version
+RUN pip install --no-cache-dir poetry==1.8.2
+# don't create virtual env
+RUN poetry config virtualenvs.create false
+# install dependecies from poetry.lock without dev and self package 
+RUN poetry install --no-dev --no-root
+
+# final stage: image build
+FROM python:3.12-slim
+WORKDIR /app
+# copy packages from builder to image
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+# copy from host to image
+COPY ./app ./app
+
+COPY ./ci-cd/entrypoint.py ./entrypoint.py
+# make ./entrypoint.py executable (+x adds execute permission)
+# RUN chmod +x ./entrypoint.py
+
+COPY ./deploy/config_fields.json ./config_fields.json
+COPY ./alembic.ini ./alembic.ini
+
+# rm -rf /var/lib/apt/lists/* cleans apt cache to reduce image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl && rm -rf /var/lib/apt/lists/*
+
+ENV APP_PREFIX=FASTAPI_DDD_TEMPLATE
+# CMD sh -c shell form; uns sh interpretator(bash is not present in slim), -c specifies string to execute
+# -f makes curl return nonzero on HTTP errors so || will run exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD bash -lc 'hv=${APP_PREFIX}_UVICORN_HOST; pv=${APP_PREFIX}_UVICORN_PORT; \
+                curl -f "http://${!hv:-localhost}:${!pv:-8000}/health" || exit 1'
