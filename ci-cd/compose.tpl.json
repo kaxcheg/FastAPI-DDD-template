@@ -1,0 +1,63 @@
+{   "name": "fastapi_ddd_template",
+    "services": {
+        "db": {
+            "image": "postgres:16",
+            "environment": {
+                "POSTGRES_USER": "${POSTGRES_ADMIN}"
+            },
+            "volumes": [
+                "pgdata:/var/lib/postgresql/data"
+            ],
+            "restart": "unless-stopped",
+            "healthcheck": {
+                "test": [
+                    "CMD-SHELL",
+                    "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+                ],
+                "interval": "10s",
+                "timeout": "5s",
+                "retries": 5
+            },
+            "secrets": null
+        },
+        "db-bootstrap": {
+            "image": "postgres:16",
+            "depends_on": {
+                "db": {
+                    "condition": "service_healthy"
+                }
+            },
+            "restart": "no",
+            "entrypoint": ["/bin/bash", "-lc", "bash /bootstrap/bootstrap_db.sh"],
+            "environment": {
+                "DB_HOST": "db",
+                "DB_ADMIN": "${POSTGRES_ADMIN}"
+            },
+            "secrets": null,
+            "volumes": [
+                "./bootstrap:/bootstrap:ro"
+            ]
+        },
+        "app": {
+            "image": null,
+            "depends_on": {
+                "db": {
+                    "condition": "service_healthy"
+                },
+                "db-bootstrap": { 
+                    "condition": "service_completed_successfully"
+                }
+                
+            },
+            "environment": null,
+            "ports": null,
+            "restart": "unless-stopped",
+            "entrypoint": null,
+            "secrets": null
+        }
+    },
+    "volumes": {
+        "pgdata": {}
+    },
+    "secrets": null
+}
