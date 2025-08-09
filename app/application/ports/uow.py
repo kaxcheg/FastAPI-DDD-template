@@ -1,46 +1,59 @@
-from typing import Self
+from __future__ import annotations
 
-from app.config.logging import setup_logger
-
-
+import logging
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import Type, TypeVar
+from types import TracebackType
+from typing import ClassVar, Type, override
 
-from app.domain.exceptions.base import DomainError
 from app.application.exceptions.base import ApplicationError
+
 from app.domain.entities.user.repo import Repository
-R_co = TypeVar("R_co", bound=Repository, covariant=True)
+from app.domain.exceptions.base import DomainError
 
-class UnitOfWork(AbstractAsyncContextManager, ABC):
-    """Base UoW: обработка commit/rollback «из коробки»."""
+from app.config.logging import get_logger
 
-    logger = setup_logger(__name__)
 
-    # — инфраструктура должна реализовать эти методы —
+class UnitOfWork[R: Repository](AbstractAsyncContextManager, ABC):
+    """Unit-of-Work abstraction around a transactional session.
+
+    Args:
+        R: Concrete repository interface bound to this UoW.
+    """
+
+    logger: ClassVar[logging.Logger] = get_logger(__name__)
+
     @abstractmethod
-    async def _open(self) -> None: ...        # начать транзакцию / сессию
+    async def _open(self) -> None: ...
     @abstractmethod
     async def commit(self) -> None: ...
     @abstractmethod
     async def rollback(self) -> None: ...
     @abstractmethod
-    async def _close(self) -> None: ...       # закрыть соединение / сессию
+    async def _close(self) -> None: ...
     @abstractmethod
-    def get_repo(self, iface: Type[R_co]) -> R_co: ...
+    def get_repo(self, iface: Type[R]) -> R: ...
 
-    # — шаблонный код, который повторять не придётся —
-    async def __aenter__(self) -> Self:
+    @override
+    async def __aenter__(self) -> UnitOfWork[R]:
         await self._open()
         return self
 
-    async def __aexit__(self, exc_type, *_):
+    @override
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         try:
             if exc_type is None:
                 await self.commit()
             else:
                 if exc_type not in (DomainError, ApplicationError):
-                    self.logger.error({"event": f"Error in infrastructure layer occured while UOW was opened"}, exc_info=True)
+                    self.logger.error(
+                        {"event": "unhandled infra-layer error in UoW"}, exc_info=True
+                    )
                 await self.rollback()
         finally:
             await self._close()

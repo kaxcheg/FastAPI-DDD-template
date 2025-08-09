@@ -1,4 +1,3 @@
-# ------------ transport DTO --------------------------------------------------
 from pydantic import BaseModel, Field
 
 from app.domain.value_objects.constants import USERNAME_MAX_LEN, USERNAME_MIN_LEN, RAW_PASSWORD_MIN_LEN, RAW_PASSWORD_MAX_LEN

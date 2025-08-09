@@ -1,2 +1,2 @@
 class ApplicationError(Exception):
-    pass
+    """Base class for all Application errors."""

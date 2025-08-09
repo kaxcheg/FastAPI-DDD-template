@@ -31,8 +31,8 @@ class CredentialDTO(DTO):
     """Flat generic DTO for any kind of authentication artefact."""
     scheme: Literal[
         "bearer",     # Authorization: Bearer <token>
-        "cookie",     # Set/Send cookies
+        "cookie",     # сookies
         "basic",      # Basic <base64>
-        "apikey",     # X-Api-Key / query param
+        "apikey",     # X-Api-Key
     ]
     value: str|dict|list

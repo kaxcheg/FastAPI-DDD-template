@@ -1,10 +1,10 @@
 from app.application.exceptions.base import ApplicationError
 
 class DuplicateUserError(ApplicationError):
-    pass
+    """Adapters should raise and use cases should handle this exception, if adding to repo existing user."""
 
 class NotAuthenticatedError(ApplicationError):
-    pass
+    """Adapters should raise and use cases should handle this exception, if user is not authenticated."""
     
 class NotAuthorizedError(ApplicationError):
-    pass
+    """Adapters should raise and use cases should handle this exception, if user is not authorized."""

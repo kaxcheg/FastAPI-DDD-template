@@ -1,53 +1,91 @@
-from app.application.dto import CreateUserOutputDTO, AuthRequestDTO, AuthResponseDTO
-from app.application.ports.presenters import State
+from __future__ import annotations
+
+from typing import override
+
+from app.application.dto import AuthResponseDTO, CreateUserOutputDTO
 from app.application.ports import AuthPresenter
-from app.application.ports.presenters import Presenter
+from app.application.ports.presenters import Presenter, State
+
 
 class FastAPICreateUserPresenter(AuthPresenter[CreateUserOutputDTO]):
-    def __init__(self) -> None:
-        self.response: CreateUserOutputDTO | str
+    """Presenter for create-user responses."""
 
+    def __init__(self) -> None:
+        """Initialize default state and response."""
+        self._state: State = State.ERROR
+        self.response: CreateUserOutputDTO | str = ""
+
+    @property
+    @override
+    def state(self) -> State:
+        """Return current presenter state."""
+        return self._state
+
+    @override
     def ok(self, dto: CreateUserOutputDTO) -> None:
+        """Set success state and DTO."""
         self._state = State.OK
         self.response = dto
 
+    @override
     def conflict(self, message: str) -> None:
+        """Set conflict state with message."""
         self._state = State.CONFLICT
         self.response = message
 
+    @override
     def error(self, message: str) -> None:
+        """Set error state with message."""
         self._state = State.ERROR
         self.response = message
 
+    @override
     def unauthorized(self, message: str) -> None:
-        """Called when credentials are invalid."""
+        """Set unauthorized state with message."""
         self._state = State.UNAUTHORIZED
         self.response = message
 
+    @override
     def forbidden(self, message: str) -> None:
-        """."""
+        """Set forbidden state with message."""
         self._state = State.FORBIDDEN
         self.response = message
 
+
 class FastAPIAuthenticationPresenter(Presenter[AuthResponseDTO]):
+    """Presenter for authentication responses."""
+
     def __init__(self) -> None:
-        self.response: AuthResponseDTO | str
-        
+        """Initialize default state and response."""
+        self._state: State = State.ERROR
+        self.response: AuthResponseDTO | str = ""
+
+    @property
+    @override
+    def state(self) -> State:
+        """Return current presenter state."""
+        return self._state
+
+    @override
     def ok(self, dto: AuthResponseDTO) -> None:
-        """Called when authentication succeeds."""
+        """Set success state and DTO."""
         self._state = State.OK
         self.response = dto
 
+    @override
     def error(self, message: str) -> None:
-        """Called on unexpected error."""
+        """Set error state with message."""
         self._state = State.ERROR
         self.response = message
-    
+
+    @override
     def conflict(self, message: str) -> None:
+        """Set conflict state with message."""
         self._state = State.CONFLICT
         self.response = message
-    
+
+    @override
     def unauthorized(self, message: str) -> None:
-        """Called when credentials are invalid."""
+        """Set unauthorized state with message."""
         self._state = State.UNAUTHORIZED
         self.response = message
