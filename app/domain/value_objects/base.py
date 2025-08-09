@@ -1,57 +1,49 @@
+from __future__ import annotations
+
 from abc import ABC
 from dataclasses import asdict, dataclass, fields
-from typing import Any
+from typing import Any, override
 
 from app.domain.exceptions import ValueObjectError
 
 
 @dataclass(frozen=True, repr=False)
 class ValueObject(ABC):
-    """
-    Base class for immutable value objects (VO) in the domain.
-    - Defined by its attributes, which must also be immutable.
-    - Subclasses should set `repr=False` to use the custom `__repr__` implementation
-     from this class.
-
-    For simple cases where immutability and additional behavior aren't required,
-    consider using `NewType` from `typing` as a lightweight alternative
-    to inheriting from this class.
-    """
+    """Immutable value object base type."""
 
     def __post_init__(self) -> None:
-        """
-        Hook for additional initialization and ensuring invariants.
+        """Ensure at least one field exists.
 
-        Subclasses can override this method to implement custom logic, while
-        still calling `super().__post_init__()` to preserve base checks.
+        Raises:
+            ValueObjectError: When the dataclass has no fields.
         """
         if not fields(self):
-            raise ValueObjectError(
-                f"{type(self).__name__} must have at least one field!",
-            )
+            raise ValueObjectError(f"{type(self).__name__} must have at least one field!")
 
+    @override
     def __repr__(self) -> str:
-        """
-        Returns a string representation of the value object.
-        - With 1 field: outputs the value only.
-        - With 2+ fields: outputs in `name=value` format.
-        Subclasses must set `repr=False` in @dataclass for this to work.
+        """Return a compact textual representation.
+
+        Returns:
+            str: Class name and field values.
         """
         return f"{type(self).__name__}({self._repr_value()})"
 
     def _repr_value(self) -> str:
-        """
-        Helper to build a string representation of the value object.
-        - If there is one field, returns the value of that field.
-        - Otherwise, returns a comma-separated list of `name=value` pairs.
+        """Build the inner representation used by __repr__.
+
+        Returns:
+            str: Field value string.
         """
         all_fields = fields(self)
         if len(all_fields) == 1:
-            return f"{getattr(self, all_fields[0].name)!r}"
+            return repr(getattr(self, all_fields[0].name))
         return ", ".join(f"{f.name}={getattr(self, f.name)!r}" for f in all_fields)
 
     def get_fields(self) -> dict[str, Any]:
-        """
-        Returns a dictionary of all attributes and their values.
+        """Return all field values as a dict.
+
+        Returns:
+            dict[str, Any]: Mapping of field names to values.
         """
         return asdict(self)
