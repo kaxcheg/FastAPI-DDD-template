@@ -4,17 +4,29 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.interface.http.routes import users, login
-from app.config import settings
-from app.config.logging import setup_logger
+from app.config.logging import get_logger, configure_logging
 
-app = FastAPI(title="Airbnb & Booking REST API",
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None,
-)
+logger = get_logger(__name__)  # Reuse module-level logger.
 
-app.include_router(users.router, tags=["User"])
-app.include_router(login.router, tags=["Login"])
+
+def create_app() -> FastAPI:
+    """Create and configure FastAPI application instance."""
+    configure_logging()
+
+    app = FastAPI(title="FastAPI DDD template")
+    app.include_router(users.router, tags=["User"])
+    app.include_router(login.router, tags=["Login"])
+    return app
+
+
+app = create_app()
+
+
+@app.get("/health", tags=["Health"])
+def healthcheck() -> dict[str, str]:
+    """Return simple health status."""
+    return {"status": "ok"}
+
 
 @app.middleware("http")
 async def catch_unhandled_exceptions_middleware(request: Request, call_next):

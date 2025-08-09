@@ -1,121 +1,145 @@
-# -----------------------------------------------------------------------------
-# Settings loading priority (Pydantic BaseSettings)
-# Class attributes in BaseSettings are loaded in the following order:
-#
-# 1. Environment variables        → Highest priority
-# 2. .env file (if specified)     → Loaded automatically via `env_file=".env"` in SettingsConfigDict
-# 3. Default values in the model  → Used only if not set in env vars or .env
-#
-# .env or enviromental variables provide values for settings
-# classes provide validation
-# default values are not set explicitly
-# -----------------------------------------------------------------------------
-from typing import Literal
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn, field_validator
+from __future__ import annotations
+
 import os
+from functools import lru_cache
+from typing import Literal, ClassVar
 
-APP_PREFIX = "FAST_API_DDD_TEMPLATE_"
+from pydantic import PostgresDsn, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-env = os.getenv(APP_PREFIX+"ENV")
-if not env:
-    raise ValueError(f"{APP_PREFIX}ENV cannot be empty")
+APP_PREFIX = "FASTAPI_DDD_TEMPLATE_"
 
-# List all settings here
+# All settings live here.
 class BaseConfig(BaseSettings):
-    """Common app settings with basic validation."""
-    model_config = SettingsConfigDict(
-        env_prefix=APP_PREFIX, extra="ignore"
+    """Common application settings."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_prefix=APP_PREFIX,
+        extra="ignore",
     )
 
-    # === Raw env vars ===
+    ENV: Literal["dev", "test", "prod"]
     DEBUG: bool
     LOG_DIR: str
-    JWT_SECRET_KEY: str
+
     JWT_ALGORITHM: str
     JWT_TOKEN_EXPIRY_TIME: int
+    JWT_SECRET: SecretStr
+
+    POSTGRES_DRIVER: Literal["postgresql+asyncpg", "postgresql+psycopg"] = (
+        "postgresql+asyncpg"
+    )
     POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
+    POSTGRES_USER_SECRET: SecretStr
     POSTGRES_DB: str
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_DRIVER: Literal["asyncpg", "psycopg"] = "asyncpg"
-    POSTGRES_PORT: int = 5432
+
     UVICORN_HOST: str
     UVICORN_PORT: int
 
-    # === Validation ===
+    APP_BOOTSTRAP_ADMIN: bool = False
+    APP_ADMIN: str
+    APP_ADMIN_PASSWORD_HASH: SecretStr
+
     @field_validator("JWT_TOKEN_EXPIRY_TIME")
     @classmethod
     def _positive(cls, v: int) -> int:
+        """Ensure token expiry is positive."""
         if v <= 0:
             raise ValueError("JWT_TOKEN_EXPIRY_TIME must be positive")
         return v
 
-    # === Derived value ===
     @property
-    def POSTGRES_URL(self) -> PostgresDsn:       
-        """Build DSN from atomic parts."""
-        return PostgresDsn.build(             
-            scheme=f"postgresql+{self.POSTGRES_DRIVER}",
+    def POSTGRES_URL(self) -> PostgresDsn:
+        """Return built DSN."""
+        return PostgresDsn.build(
+            scheme=self.POSTGRES_DRIVER,
             username=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD,
+            password=self.POSTGRES_USER_SECRET.get_secret_value(),
             host=self.POSTGRES_HOST,
-            port=self.POSTGRES_PORT,
-            path=self.POSTGRES_DB,
-        )    
+            port=5432,
+            path=f"{self.POSTGRES_DB}",
+        )
 
-# Development config
+
 class DevConfig(BaseConfig):
-    model_config = SettingsConfigDict(env_file=f".env.dev", env_prefix=APP_PREFIX, extra="ignore")
-    
+    """Development configuration."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_file=".env.dev",
+        env_prefix=APP_PREFIX,
+        secrets_dir="/run/secrets",
+        extra="ignore",
+    )
+
     @field_validator("DEBUG")
     @classmethod
-    def enforce_debug_true(cls, v: bool) -> bool:
-        if v is False:
+    def _enforce_debug_true(cls, v: bool) -> bool:
+        """Ensure DEBUG is True in development."""
+        if not v:
             raise ValueError("DEBUG must be True in development")
         return v
 
-# Testing config
+
 class TestConfig(BaseConfig):
-    model_config = SettingsConfigDict(env_file=None, env_prefix=APP_PREFIX, extra="ignore")
-    
+    """Testing configuration."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_file=None,
+        env_prefix=APP_PREFIX,
+        secrets_dir="/run/secrets",
+        extra="ignore",
+    )
+
     @field_validator("DEBUG")
     @classmethod
-    def enforce_debug_false(cls, v: bool) -> bool:
-        if v is True:
+    def _enforce_debug_false(cls, v: bool) -> bool:
+        """Ensure DEBUG is False in testing."""
+        if v:
             raise ValueError("DEBUG must be False in testing")
         return v
 
-# Production config
+
 class ProdConfig(BaseConfig):
-    model_config = SettingsConfigDict(env_file=None, env_prefix=APP_PREFIX, extra="ignore")
-    
+    """Production configuration."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_file=None,
+        env_prefix=APP_PREFIX,
+        secrets_dir="/run/secrets",
+        extra="ignore",
+    )
+
     @field_validator("DEBUG")
     @classmethod
-    def enforce_debug_false(cls, v: bool) -> bool:
-        if v is True:
+    def _enforce_debug_false(cls, v: bool) -> bool:
+        """Ensure DEBUG is False in production."""
+        if v:
             raise ValueError("DEBUG must be False in production")
         return v
 
-    @field_validator("JWT_SECRET_KEY")
+    @field_validator("JWT_SECRET")
     @classmethod
-    def check_dev_secret(cls, v: str) -> str:
-        if "secret" in v:
-            raise ValueError("Invalid JWT_SECRET_KEY in production")
+    def _check_secret(cls, v: SecretStr) -> SecretStr:
+        """Deny weak secrets in production."""
+        if "secret" in v.get_secret_value():
+            raise ValueError("Invalid JWT_SECRET in production")
         return v
 
+# Cache config instance to avoid recreating settings on every import.
+@lru_cache
 def get_settings() -> BaseConfig:
-    assert isinstance(env, str)
+    """Return singleton config by ENV."""
+    env = os.getenv(f"{APP_PREFIX}ENV")
+    if not env:
+        raise ValueError(f"{APP_PREFIX}ENV cannot be empty")
+
     match env.lower():
         case "dev":
-            return_config = DevConfig() # pyright: ignore[reportCallIssue]
+            return DevConfig()  # pyright: ignore[reportCallIssue]
         case "test":
-            return_config = TestConfig() # pyright: ignore[reportCallIssue]
+            return TestConfig() # pyright: ignore[reportCallIssue]
         case "prod":
-            return_config = ProdConfig() # pyright: ignore[reportCallIssue]
+            return ProdConfig() # pyright: ignore[reportCallIssue]
         case _:
             raise ValueError(f"Unknown ENV value: {env.lower()}")
-
-    return return_config
-
-settings = get_settings()
