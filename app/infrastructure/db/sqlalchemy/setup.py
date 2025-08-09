@@ -1,14 +1,24 @@
+from functools import lru_cache
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from app.config import settings
+from app.config import get_settings
 
-engine = create_async_engine(
-    str(settings.POSTGRES_URL),
-    echo=False,
-    pool_pre_ping=True,
-)
+@lru_cache
+def get_engine():
+    """Lazy singleton async engine."""
+    cfg = get_settings()
+    return create_async_engine(
+        str(cfg.POSTGRES_URL), 
+        connect_args={"server_settings": {"search_path": "app,public"}},
+        echo=False,
+        pool_pre_ping=True,
+    )
 
-async_session_factory = async_sessionmaker(
-    engine,
-    expire_on_commit=False,      
-)
+@lru_cache
+def get_session_factory():
+    """Lazy singleton session factory (bound to engine)."""
+    return async_sessionmaker(
+        get_engine(),
+        expire_on_commit=False,
+    )
