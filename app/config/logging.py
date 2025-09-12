@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Final
@@ -17,7 +18,7 @@ def configure_logging() -> None:
     if _logger_configured:
         return
     cfg = get_settings()
-    log_dir = Path(cfg.LOG_DIR)
+    log_dir = Path(cfg.FASTAPI_DDD_TEMPLATE_LOG_DIR)
     log_dir.mkdir(parents=True, exist_ok=True)
     _logger_configured = True
 
@@ -55,6 +56,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(data, ensure_ascii=False).replace('\\"', '"').replace('\\\\', '\\')
 
 
+class LevelFilter(logging.Filter):
+    def __init__(self, min_level: int|None = None, max_level: int|None = None):
+        super().__init__()
+        self.min_level = min_level
+        self.max_level = max_level
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if self.min_level is not None and record.levelno < self.min_level:
+            return False
+        if self.max_level is not None and record.levelno > self.max_level:
+            return False
+        return True
+
 def get_logger(name: str) -> logging.Logger:
     """Return configured logger.
 
@@ -67,10 +81,10 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
     cfg = get_settings()
-    logger.setLevel(logging.DEBUG if cfg.DEBUG else logging.INFO)
+    logger.setLevel(logging.DEBUG if cfg.FASTAPI_DDD_TEMPLATE_DEBUG else logging.INFO)
 
     # File handler — one per logger.
-    log_path = os.path.join(cfg.LOG_DIR, f"{name}.log")
+    log_path = os.path.join(cfg.FASTAPI_DDD_TEMPLATE_LOG_DIR, f"{name}.log")
     Path(log_path).parent.mkdir(parents=True, exist_ok=True)
     if not any(
         isinstance(h, RotatingFileHandler) and h.baseFilename == log_path
@@ -80,5 +94,21 @@ def get_logger(name: str) -> logging.Logger:
         handler.setLevel(logger.level)
         handler.setFormatter(JsonFormatter())
         logger.addHandler(handler)
+
+    # Stdout handler: INFO and below 
+    if not any(isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stdout for h in logger.handlers):
+        sh_out = logging.StreamHandler(sys.stdout)
+        sh_out.setLevel(logging.DEBUG)
+        sh_out.addFilter(LevelFilter(max_level=logging.INFO))
+        sh_out.setFormatter(JsonFormatter())
+        logger.addHandler(sh_out)
+
+    # Stderr handler: WARNING and above 
+    if not any(isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stderr for h in logger.handlers):
+        sh_err = logging.StreamHandler(sys.stderr)
+        sh_err.setLevel(logging.WARNING)
+        sh_err.addFilter(LevelFilter(min_level=logging.WARNING))
+        sh_err.setFormatter(JsonFormatter())
+        logger.addHandler(sh_err)
 
     return logger

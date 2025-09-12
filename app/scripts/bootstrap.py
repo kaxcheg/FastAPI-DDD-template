@@ -20,7 +20,7 @@ from app.config import get_settings
 
 
 cfg = get_settings()
-engine = create_async_engine(str(cfg.POSTGRES_URL), pool_pre_ping=True)
+engine = create_async_engine(str(cfg.DB_URL), pool_pre_ping=True)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -30,16 +30,14 @@ def uow_factory() -> UnitOfWork:
 
 
 async def main() -> int:
-    """Bootstrap: create an admin user once, if the flag is enabled."""
-    if not cfg.APP_BOOTSTRAP_ADMIN:
-        print("[create_admin] Bootstrap flag is false. Exiting.")
-        sys.exit(0)
+    """Bootstrap: create an admin user once"""
 
-    username = cfg.APP_ADMIN
-    password_hash = cfg.APP_ADMIN_PASSWORD_HASH.get_secret_value()
+    username = cfg.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN
+    password_hash = cfg.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH.get_secret_value()
 
     if not username or not password_hash:
-        sys.exit("[create_admin] ENV APP_ADMIN, APP_ADMIN_PASSWORD_HASH must be set")
+        sys.exit("[fastapi_ddd_template_bootstrap] FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN, " \
+        "FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH must be set")
 
     try:
         user = User.create(
@@ -48,18 +46,18 @@ async def main() -> int:
             role=UserRole.ADMIN,
             id_gen=UUIDv4Generator(),
         )
-    except (DomainError, ValueError):
-        sys.exit("[create_admin] User with provided parameters cannot be created.")
+    except (DomainError, ValueError) as e:
+        sys.exit(f"[fastapi_ddd_template_bootstrap] User with provided parameters cannot be created: {e}")
 
     try:
         async with uow_factory() as uow:
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
     except DuplicateUserError:
-        print("[create_admin] Username already exists")
+        print("[fastapi_ddd_template_bootstrap] Username already exists")
         sys.exit(0)
 
-    print(f"[create_admin] Admin created (id={user.id}, user={user.username})")
+    print(f"[fastapi_ddd_template_bootstrap] Admin created (id={user.id}, user={user.username})")
     sys.exit(0)
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Callable, ClassVar, override
+from typing import Callable, ClassVar, TypeVar, override
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -89,6 +89,7 @@ class UserRepositorySQL(UserRepository):
         except IntegrityError as e:
             raise DuplicateUserError(f"User {user.username} already exists") from e
 
+R = TypeVar("R", bound=Repository)
 
 class UoWSQL(UnitOfWork):
     """Unit-of-Work adapter for async SQLAlchemy."""
@@ -128,7 +129,7 @@ class UoWSQL(UnitOfWork):
             await self._session.close()
 
     @override
-    def get_repo[R: Repository](self, iface: type[R]) -> R:
+    def get_repo(self, iface: type[R]) -> R:
         """Return repository instance bound to current session.
 
         Args:
@@ -144,6 +145,7 @@ class UoWSQL(UnitOfWork):
             raise KeyError(f"Repository not registered: {iface!r}") from e
 
         repo = factory(self._session)
+        
         # Safe cast: registry binds factory to iface type.
         from typing import cast
         return cast(R, repo)

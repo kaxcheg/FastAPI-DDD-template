@@ -1,1 +1,1 @@
-from app.config.config import get_settings, APP_PREFIX, BaseConfig
+from app.config.config import get_settings, BaseConfig

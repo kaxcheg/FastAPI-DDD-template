@@ -59,8 +59,8 @@ class CreateUserUseCase(
                 role=UserRole(dto.role),
                 id_gen=self._id_gen,
             )
-        except (DomainError, ValueError, ValueObjectError):
-            presenter.error("User with provided parameters cannot be created.")
+        except (DomainError, ValueError, ValueObjectError) as e:
+            presenter.error(f"User with provided parameters cannot be created: {e}")
             return
 
         try:
