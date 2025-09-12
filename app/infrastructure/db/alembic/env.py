@@ -13,7 +13,8 @@ from app.config import get_settings
 
 settings = get_settings()
 config = context.config
-config.set_main_option("sqlalchemy.url", str(settings.POSTGRES_URL))
+config.set_main_option("sqlalchemy.url", str(settings.DB_URL))
+config.set_main_option("version_table_schema", str(settings.DB_TABLE_SCHEMA))
 
 if config.config_file_name:
     fileConfig(config.config_file_name)
@@ -27,7 +28,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
-        version_table_schema="app",
+        version_table_schema=settings.DB_TABLE_SCHEMA,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -42,7 +43,7 @@ def _configure_connection(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        version_table_schema="app",
+        version_table_schema=settings.DB_TABLE_SCHEMA,
         compare_type=True,
         compare_server_default=True,
         include_schemas=False,  # set True if your models specify schema

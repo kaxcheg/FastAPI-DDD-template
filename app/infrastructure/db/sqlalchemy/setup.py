@@ -9,7 +9,7 @@ def get_engine():
     """Lazy singleton async engine."""
     cfg = get_settings()
     return create_async_engine(
-        str(cfg.POSTGRES_URL), 
+        str(cfg.DB_URL), 
         connect_args={"server_settings": {"search_path": "app,public"}},
         echo=False,
         pool_pre_ping=True,

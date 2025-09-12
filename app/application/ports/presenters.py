@@ -21,16 +21,40 @@ class Presenter[D: DTO](Protocol):
     _state: State
     response: D | str
 
-    def ok(self, dto: D, /) -> None: ...
-    def error(self, message: str, /) -> None: ...
-    def conflict(self, message: str, /) -> None: ...
-    def unauthorized(self, message: str, /) -> None: ...
-
     @property
-    def state(self) -> State: ...
+    def state(self) -> State:
+        """Return current presenter state."""
+        return self._state
+
+    def ok(self, dto: D) -> None:
+        """Set success state and DTO."""
+        self._state = State.OK
+        self.response = dto
+
+    def error(self, message: str) -> None:
+        """Set error state with message."""
+        self._state = State.ERROR
+        self.response = message
+
+    def conflict(self, message: str) -> None:
+        """Set conflict state with message."""
+        self._state = State.CONFLICT
+        self.response = message
+
+    def unauthorized(self, message: str) -> None:
+        """Set unauthorized state with message."""
+        self._state = State.UNAUTHORIZED
+        self.response = message
+
+
+    # @property
+    # def state(self) -> State: ...
 
 
 class AuthPresenter[D: DTO](Presenter[D]):
     """Presenter with extra forbidden handler."""
 
-    def forbidden(self, message: str) -> None: ...
+    def forbidden(self, message: str) -> None:
+        """Set forbidden state with message."""
+        self._state = State.FORBIDDEN
+        self.response = message

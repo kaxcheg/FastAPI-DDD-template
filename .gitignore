@@ -195,4 +195,4 @@ logs/
 log/
 
 # secrets
-*secret*
+secrets
