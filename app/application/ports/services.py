@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable, TypeVar
 
+from app.application.dto import CredentialDTO
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
 from app.domain.value_objects import (
@@ -28,6 +29,11 @@ R = TypeVar("R", bound=UserRepository, covariant=True, contravariant=False)
 
 class AuthService[R](Protocol):
     """Authentication/authorization service contract."""
+    
+    _credentials: CredentialDTO
 
-    def ensure_role(self, user_id: UserId, role: UserRole, target_role: UserRole, ) -> None: ...
+    def __init__(self, credentials: CredentialDTO) -> None:
+        self._credentials = credentials
+
     async def current_user(self, repo: R) -> User: ...
+    def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole, ) -> None: ...

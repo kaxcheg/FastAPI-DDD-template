@@ -17,12 +17,12 @@ from app.domain.entities.user.repo import UserRepository
 from app.domain.value_objects import UserId, UserPasswordHash, UserRole, Username
 from app.domain.services import IdGenerator
 
-from app.application.dto import CredentialDTO
 from app.application.exceptions import (
     DuplicateUserError,
     NotAuthenticatedError,
     NotAuthorizedError,
 )
+from app.application.dto import CredentialDTO
 from app.application.ports.services import AuthService
 from app.application.ports.uow import UnitOfWork
 
@@ -164,20 +164,11 @@ class UUIDv4Generator(IdGenerator):
 class TokenSQLAuthService(AuthService[UserRepository]):
     """Auth facade using JWT and SQL repository."""
 
-    _credentials: CredentialDTO
-
     def __init__(self, credentials: CredentialDTO, token_service: JwtTokenService) -> None:
         """Store credentials and token service."""
-        self._credentials = credentials
+        
+        super().__init__(credentials)
         self._token_service = token_service
-
-    @override
-    def ensure_role(self, user_id: UserId, role: UserRole, target_role: UserRole) -> None:
-        """Raise when role is insufficient."""
-        # Allow ADMIN and the exact target role.
-        if role in {UserRole.ADMIN, target_role}:
-            return
-        raise NotAuthorizedError("Forbidden")
 
     @override
     async def current_user(self, repo: UserRepository) -> User:
@@ -199,3 +190,13 @@ class TokenSQLAuthService(AuthService[UserRepository]):
             raise NotAuthenticatedError("Unauthorized")
 
         return user
+    
+    @override
+    def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole) -> None:
+        """Raise when role is insufficient."""
+        # Allow ADMIN and the exact target role.
+        if user_role in {UserRole.ADMIN, required_role}:
+            return
+        raise NotAuthorizedError("Forbidden")
+
+
