@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, override
 
+from app.application.dto import CredentialDTO
 from app.application.ports.services import AuthService, PasswordHasher
 from app.application.ports.uow import UnitOfWork
 from app.domain.entities.user.user import User
@@ -19,9 +20,7 @@ from app.application.exceptions import DuplicateUserError
 from app.config.logging import get_logger
 
 
-class CreateUserUseCase(
-    AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutputDTO]
-):
+class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutputDTO]):
     """Use case for creating new users (admin-only)."""
 
     logger = get_logger(__name__)
@@ -38,7 +37,7 @@ class CreateUserUseCase(
         super().__init__(
             auth_service=auth_service,
             uow_factory=uow_factory,
-            target_role=UserRole.ADMIN,
+            required_role=UserRole.ADMIN,
         )
         self._hasher = hasher
         self._id_gen = id_gen

@@ -18,11 +18,14 @@ class State(Enum):
 class Presenter[D: DTO](Protocol):
     """Presenter contract that emits success or failure output."""
 
-    _state: State
+    _state: State | None
     response: D | str
 
+    def __init__(self) -> None:
+        self._state = None
+
     @property
-    def state(self) -> State:
+    def state(self) -> State | None:
         """Return current presenter state."""
         return self._state
 
@@ -45,10 +48,6 @@ class Presenter[D: DTO](Protocol):
         """Set unauthorized state with message."""
         self._state = State.UNAUTHORIZED
         self.response = message
-
-
-    # @property
-    # def state(self) -> State: ...
 
 
 class AuthPresenter[D: DTO](Presenter[D]):

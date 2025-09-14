@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from importlib.metadata import requires
 from typing import Protocol, Callable, final
 
 from app.domain.value_objects import UserRole
 from app.domain.entities.user.repo import UserRepository
 from app.application.ports.services import AuthService
 from app.application.dto.base import DTO
+from app.application.dto import CredentialDTO
 from app.application.ports.presenters import Presenter
 from app.application.ports import AuthPresenter, UnitOfWork
 from app.domain.exceptions.base import DomainError
@@ -22,7 +24,7 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](Protocol):
     """Use case base that checks authentication and role before execution."""
 
     _auth: AuthService[UserRepository]
-    _target_role: UserRole
+    _required_role: UserRole
     _uow_factory: Callable[[], UnitOfWork]
 
     logger = get_logger(__name__)
@@ -31,12 +33,12 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](Protocol):
         self,
         uow_factory: Callable[[], UnitOfWork],
         auth_service: AuthService[UserRepository],
-        target_role: UserRole,
+        required_role: UserRole,
     ) -> None:
         """Initialize with UoW factory, auth service and target role."""
         self._uow_factory = uow_factory
         self._auth = auth_service
-        self._target_role = target_role
+        self._required_role = required_role
 
     @final
     async def execute(self, dto: I, presenter: AuthPresenter[O]) -> None:
@@ -50,7 +52,7 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](Protocol):
             return
 
         try:
-            self._auth.ensure_role(user.id, user.role, self._target_role)
+            self._auth.ensure_role(user.id, user.role, self._required_role)
         except NotAuthorizedError:
             presenter.forbidden("Forbidden")
             self.logger.warning(

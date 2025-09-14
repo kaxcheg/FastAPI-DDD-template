@@ -71,15 +71,18 @@ def get_auth_service(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
 ) -> AuthService[UserRepository]:
     """Return AuthService bound to JWT credentials."""
-    dto = CredentialDTO(scheme="bearer", value=credentials.credentials)
-    return TokenSQLAuthService(credentials=dto, token_service=get_jwt_service())
+
+    return TokenSQLAuthService(
+        credentials=CredentialDTO(scheme="bearer", value=credentials.credentials), 
+        token_service=get_jwt_service()
+    )
 
 
 def get_create_user_uc(
     uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
     hasher: Annotated[PasswordHasher, Depends(get_hasher)],
     id_gen: Annotated[IdGenerator, Depends(get_id_gen)],
-    auth_service: Annotated[AuthService[UserRepository], Depends(get_auth_service)] 
+    auth_service: Annotated[AuthService[UserRepository], Depends(get_auth_service)],
 ) -> CreateUserUseCase:
     """Return CreateUser use case with injected ports."""
     return CreateUserUseCase(
