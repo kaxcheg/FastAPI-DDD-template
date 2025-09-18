@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable, TypeVar
+from abc import ABC, abstractmethod
 
 from app.application.dto import CredentialDTO
 from app.domain.entities.user import User
@@ -25,15 +26,18 @@ class PasswordVerifier(Protocol):
 
     def verify(self, raw_password: UserRawPassword, hashed_password: UserPasswordHash) -> bool: ...
 
-R = TypeVar("R", bound=UserRepository, covariant=True, contravariant=False)
+R = TypeVar("R", bound=UserRepository, contravariant=True)
 
-class AuthService[R](Protocol):
+class AuthService[R](ABC):
     """Authentication/authorization service contract."""
     
     _credentials: CredentialDTO
-
+    
     def __init__(self, credentials: CredentialDTO) -> None:
         self._credentials = credentials
-
+    
+    @abstractmethod
     async def current_user(self, repo: R) -> User: ...
+    
+    @abstractmethod
     def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole, ) -> None: ...
