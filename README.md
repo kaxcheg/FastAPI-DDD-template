@@ -1,7 +1,7 @@
 # FastAPI DDD Template
 
 **FastAPI‑DDD Template** is a sample project that demonstrates how to
-organise a FastAPI application using Domain‑Driven Design (DDD)
+organise a FastAPI application using SOLID and Domain‑Driven Design (DDD)
 principles. It is built with FastAPI, SQLAlchemy and Pydantic and
 provides a minimal yet complete example of how to structure a service
 with clear boundaries between the domain, application, infrastructure

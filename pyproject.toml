@@ -1,7 +1,7 @@
 [project]
 name = "fastapi-ddd-template"
 version = "0.1.0"
-description = "Example of DDD architecture with FastAPI and SQLAlchemy"
+description = "Example of SOLID DDD architecture with FastAPI and SQLAlchemy"
 authors = [
     {name = "kaxcheg",email = "kaxcheg@gmail.com"}
 ]

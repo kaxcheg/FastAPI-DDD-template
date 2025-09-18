@@ -164,6 +164,7 @@ class UUIDv4Generator(IdGenerator):
 class TokenSQLAuthService(AuthService[UserRepository]):
     """Auth facade using JWT and SQL repository."""
 
+    @override
     def __init__(self, credentials: CredentialDTO, token_service: JwtTokenService) -> None:
         """Store credentials and token service."""
         
