@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from app.domain.entities.base import Entity
 from app.domain.exceptions.base import DomainError
 from app.domain.services import IdGenerator
-from app.domain.value_objects import UserId, UserPasswordHash, UserRole, Username
+from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
+
 
 @dataclass(eq=False, kw_only=True)
 class User(Entity[UserId]):

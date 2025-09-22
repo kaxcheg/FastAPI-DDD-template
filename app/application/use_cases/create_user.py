@@ -2,22 +2,19 @@ from __future__ import annotations
 
 from typing import Callable, override
 
-from app.application.dto import CredentialDTO
+from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
+from app.application.exceptions import DuplicateUserError
+from app.application.ports.presenters import AuthPresenter
 from app.application.ports.services import AuthService, PasswordHasher
 from app.application.ports.uow import UnitOfWork
-from app.domain.entities.user.user import User
-from app.domain.services.services import IdGenerator
-from app.domain.value_objects import UserRole, Username, UserRawPassword
-from app.domain.entities.user.repo import UserRepository
-from app.domain.exceptions.base import DomainError
-from app.domain.exceptions import ValueObjectError
-
 from app.application.use_cases.base import AuthorizeUserUseCase
-from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
-from app.application.ports.presenters import AuthPresenter
-from app.application.exceptions import DuplicateUserError
-
 from app.config.logging import get_logger
+from app.domain.entities.user.repo import UserRepository
+from app.domain.entities.user.user import User
+from app.domain.exceptions import ValueObjectError
+from app.domain.exceptions.base import DomainError
+from app.domain.services.services import IdGenerator
+from app.domain.value_objects import Username, UserRawPassword, UserRole
 
 
 class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutputDTO]):

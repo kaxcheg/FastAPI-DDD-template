@@ -1,25 +1,26 @@
-from functools import lru_cache
 from datetime import timedelta
-from typing import Callable, Annotated
+from functools import lru_cache
+from typing import Annotated, Callable
 
 from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-from app.domain.entities.user.repo import UserRepository
-from app.domain.services.services import IdGenerator
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.dto import CredentialDTO
+from app.application.ports.services import AuthService, PasswordHasher, PasswordVerifier
 from app.application.ports.uow import UnitOfWork
-from app.application.ports.services import PasswordHasher, AuthService, PasswordVerifier
-from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
-
-from app.infrastructure.db.sqlalchemy.adapters import UUIDv4Generator, UoWSQL, TokenSQLAuthService
+from app.application.use_cases.create_user import CreateUserUseCase
+from app.config import get_settings
+from app.domain.entities.user.repo import UserRepository
+from app.domain.services.services import IdGenerator
+from app.infrastructure.db.sqlalchemy.adapters import (
+    TokenSQLAuthService,
+    UoWSQL,
+    UUIDv4Generator,
+)
 from app.infrastructure.db.sqlalchemy.setup import get_session_factory
 from app.infrastructure.security.adapters import BcryptHasher, BcryptPasswordVerifier
 from app.infrastructure.security.jwt_service import JwtTokenService
-
-from app.config import get_settings
 
 security: HTTPBearer = HTTPBearer()
 
@@ -31,7 +32,9 @@ def get_jwt_service() -> JwtTokenService:
     return JwtTokenService(
         secret=cfg.FASTAPI_DDD_TEMPLATE_JWT_SECRET,
         algorithm=cfg.FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM,
-        default_expires=timedelta(minutes=cfg.FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME),
+        default_expires=timedelta(
+            minutes=cfg.FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME
+        ),
         required_claims=("sub", "exp", "role"),
     )
 
@@ -68,13 +71,13 @@ def get_authenticate_user_uc(
 
 
 def get_auth_service(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> AuthService[UserRepository]:
     """Return AuthService bound to JWT credentials."""
 
     return TokenSQLAuthService(
-        credentials=CredentialDTO(scheme="bearer", value=credentials.credentials), 
-        token_service=get_jwt_service()
+        credentials=CredentialDTO(scheme="bearer", value=credentials.credentials),
+        token_service=get_jwt_service(),
     )
 
 

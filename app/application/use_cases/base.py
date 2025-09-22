@@ -1,33 +1,34 @@
 from __future__ import annotations
 
-from importlib.metadata import requires
-from typing import Protocol, Callable, final
+from abc import ABC
+from logging import Logger
+from typing import Callable, final
 
-from app.domain.value_objects import UserRole
-from app.domain.entities.user.repo import UserRepository
-from app.application.ports.services import AuthService
 from app.application.dto.base import DTO
-from app.application.dto import CredentialDTO
-from app.application.ports.presenters import Presenter
-from app.application.ports import AuthPresenter, UnitOfWork
-from app.domain.exceptions.base import DomainError
 from app.application.exceptions import NotAuthenticatedError, NotAuthorizedError
+from app.application.ports import AuthPresenter, UnitOfWork
+from app.application.ports.presenters import Presenter
+from app.application.ports.services import AuthService
 from app.config.logging import get_logger
+from app.domain.entities.user.repo import UserRepository
+from app.domain.exceptions.base import DomainError
+from app.domain.value_objects import UserRole
 
-class UseCase[I: DTO, O: DTO](Protocol):
+
+class UseCase[I: DTO, O: DTO](ABC):
     """Application use case contract."""
 
     async def execute(self, dto: I, presenter: Presenter[O]) -> None: ...
 
 
-class AuthorizeUserUseCase[I: DTO, O: DTO](Protocol):
+class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
     """Use case base that checks authentication and role before execution."""
 
     _auth: AuthService[UserRepository]
     _required_role: UserRole
     _uow_factory: Callable[[], UnitOfWork]
 
-    logger = get_logger(__name__)
+    logger: Logger = get_logger(__name__)
 
     def __init__(
         self,

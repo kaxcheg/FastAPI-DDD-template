@@ -4,9 +4,9 @@ from typing import override
 
 import bcrypt
 
+from app.application.ports.services import PasswordHasher, PasswordVerifier
 from app.domain.value_objects import UserPasswordHash, UserRawPassword
 
-from app.application.ports.services import PasswordHasher, PasswordVerifier
 
 class BcryptHasher(PasswordHasher):
     """Hash raw passwords using bcrypt."""
@@ -31,7 +31,9 @@ class BcryptHasher(PasswordHasher):
         Returns:
             UserPasswordHash: Encoded bcrypt hash bytes.
         """
-        salt = bcrypt.gensalt(rounds=self._rounds)  # Generate salt with configured cost.
+        salt = bcrypt.gensalt(
+            rounds=self._rounds
+        )  # Generate salt with configured cost.
         return UserPasswordHash(bcrypt.hashpw(raw_password.value.encode(), salt))
 
 
@@ -39,7 +41,9 @@ class BcryptPasswordVerifier(PasswordVerifier):
     """Verify raw passwords against bcrypt hashes."""
 
     @override
-    def verify(self, raw_password: UserRawPassword, hashed_password: UserPasswordHash) -> bool:
+    def verify(
+        self, raw_password: UserRawPassword, hashed_password: UserPasswordHash
+    ) -> bool:
         """Return True if raw_password matches the hashed_password.
 
         Args:

@@ -6,10 +6,11 @@ from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 
-from app.infrastructure.db.sqlalchemy.models.base import Base  # noqa: F401  # metadata scan
-from app.infrastructure.db.sqlalchemy.models.user import UserORM  # noqa: F401  # ensure model import
-
 from app.config import get_settings
+from app.infrastructure.db.sqlalchemy.models.base import Base  # metadata scan
+from app.infrastructure.db.sqlalchemy.models.user import (  # noqa: F401  # ensure model import
+    UserORM,
+)
 
 settings = get_settings()
 config = context.config
@@ -21,6 +22,7 @@ if config.config_file_name:
 
 # metadata for autogeneration
 target_metadata = Base.metadata  # type: ignore[attr-defined]
+
 
 def run_migrations_offline() -> None:
     """Generate SQL migration script without an active DB connection."""

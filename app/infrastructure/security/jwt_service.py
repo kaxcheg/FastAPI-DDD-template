@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Sequence, Callable
+from typing import Any, Callable, Mapping, Sequence
 
+from jwt import ExpiredSignatureError, InvalidTokenError, decode, encode
 from pydantic import SecretStr
-from jwt import encode, decode, InvalidTokenError, ExpiredSignatureError
 
 
 class JwtTokenError(Exception):
@@ -125,7 +125,9 @@ class JwtTokenService:
         if override is None:
             base = self._default_expires
         else:
-            base = timedelta(seconds=override) if isinstance(override, int) else override
+            base = (
+                timedelta(seconds=override) if isinstance(override, int) else override
+            )
         if base is None:
             return None
         return self._clock() + base

@@ -8,6 +8,6 @@ from app.application.ports.presenters import Presenter
 class FastAPICreateUserPresenter(AuthPresenter[CreateUserOutputDTO]):
     """Presenter for create-user responses."""
 
+
 class FastAPIAuthenticationPresenter(Presenter[AuthResponseDTO]):
     """Presenter for authentication responses."""
-

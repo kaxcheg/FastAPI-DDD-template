@@ -12,6 +12,7 @@ from app.config import get_settings
 
 _logger_configured = False
 
+
 def configure_logging() -> None:
     """Idempotent logging setup (call early in bootstrap)."""
     global _logger_configured
@@ -21,6 +22,7 @@ def configure_logging() -> None:
     log_dir = Path(cfg.FASTAPI_DDD_TEMPLATE_LOG_DIR)
     log_dir.mkdir(parents=True, exist_ok=True)
     _logger_configured = True
+
 
 class JsonFormatter(logging.Formatter):
     """Format log record as JSON string and mask sensitive fields."""
@@ -53,11 +55,15 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             data["trace"] = super().formatException(record.exc_info)
 
-        return json.dumps(data, ensure_ascii=False).replace('\\"', '"').replace('\\\\', '\\')
+        return (
+            json.dumps(data, ensure_ascii=False)
+            .replace('\\"', '"')
+            .replace("\\\\", "\\")
+        )
 
 
 class LevelFilter(logging.Filter):
-    def __init__(self, min_level: int|None = None, max_level: int|None = None):
+    def __init__(self, min_level: int | None = None, max_level: int | None = None):
         super().__init__()
         self.min_level = min_level
         self.max_level = max_level
@@ -68,6 +74,7 @@ class LevelFilter(logging.Filter):
         if self.max_level is not None and record.levelno > self.max_level:
             return False
         return True
+
 
 def get_logger(name: str) -> logging.Logger:
     """Return configured logger.
@@ -95,16 +102,24 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(JsonFormatter())
         logger.addHandler(handler)
 
-    # Stdout handler: INFO and below 
-    if not any(isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stdout for h in logger.handlers):
+    # Stdout handler: INFO and below
+    if not any(
+        isinstance(h, logging.StreamHandler)
+        and getattr(h, "stream", None) is sys.stdout
+        for h in logger.handlers
+    ):
         sh_out = logging.StreamHandler(sys.stdout)
         sh_out.setLevel(logging.DEBUG)
         sh_out.addFilter(LevelFilter(max_level=logging.INFO))
         sh_out.setFormatter(JsonFormatter())
         logger.addHandler(sh_out)
 
-    # Stderr handler: WARNING and above 
-    if not any(isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stderr for h in logger.handlers):
+    # Stderr handler: WARNING and above
+    if not any(
+        isinstance(h, logging.StreamHandler)
+        and getattr(h, "stream", None) is sys.stderr
+        for h in logger.handlers
+    ):
         sh_err = logging.StreamHandler(sys.stderr)
         sh_err.setLevel(logging.WARNING)
         sh_err.addFilter(LevelFilter(min_level=logging.WARNING))

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
 from typing import override
 
-from app.domain.value_objects.base import ValueObject
 from app.domain.exceptions import ValueObjectError
+from app.domain.value_objects.base import ValueObject
 from app.domain.value_objects.constants import (
     RAW_PASSWORD_MAX_LEN,
     RAW_PASSWORD_MIN_LEN,
 )
+
 
 @dataclass(frozen=True, repr=False)
 class UserRawPassword(ValueObject):
@@ -23,7 +23,7 @@ class UserRawPassword(ValueObject):
     """
 
     value: str
-    
+
     @override
     def __post_init__(self) -> None:
         """Validate value length."""
@@ -35,7 +35,7 @@ class UserRawPassword(ValueObject):
             raise ValueObjectError(
                 f"Password length must be {RAW_PASSWORD_MIN_LEN}-{RAW_PASSWORD_MAX_LEN} symbols."
             )
-        
+
     @override
     def __repr__(self) -> str:
         """Return class name only."""

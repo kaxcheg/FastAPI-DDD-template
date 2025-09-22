@@ -25,8 +25,8 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--from-file", help=".env with KEY=VALUE secrets")
-    parser.add_argument("--yml", "-y", default="./deploy/docker-compose.yml", help="Compose manifest file")
-    parser.add_argument("--out-dir", "-o", default="./deploy/secrets", help="Output dir")
+    parser.add_argument("--yml", "-y", default="./docker-compose.yml", help="Compose manifest file")
+    parser.add_argument("--out-dir", "-o", default="./secrets", help="Output dir")
     args = parser.parse_args()
 
     with open(args.yml, "r") as fp:

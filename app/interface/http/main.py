@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Final
-
 import traceback
+from typing import Awaitable, Callable, Final
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.interface.http.routes import users, login
-from app.config.logging import get_logger, configure_logging
+from app.config.logging import configure_logging, get_logger
+from app.interface.http.routes import login, users
 
 logger = get_logger(__name__)  # Reuse module-level logger.
 
@@ -50,7 +49,9 @@ async def catch_unhandled_exceptions_middleware(
                 "trace": traceback.format_exc().splitlines(),
             }
         )
-        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        return JSONResponse(
+            status_code=500, content={"detail": "Internal server error"}
+        )
 
 
 @app.middleware("http")

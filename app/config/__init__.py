@@ -1,1 +1,3 @@
-from app.config.config import get_settings, BaseConfig
+from app.config.config import BaseConfig, get_settings
+
+__all__ = ["BaseConfig", "get_settings"]

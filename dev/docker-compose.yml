@@ -45,9 +45,9 @@ services:
     - source: db_user_secret
       target: db_user_secret
     volumes:
-    - ./bootstrap:/bootstrap:ro
+    - ../deploy/bootstrap:/bootstrap:ro
   app:
-    image: fastapi_ddd_template_app:0.1.0
+    image: fastapi_ddd_template_app:dev
     depends_on:
       db:
         condition: service_healthy
@@ -59,14 +59,17 @@ services:
       FASTAPI_DDD_TEMPLATE_LOG_DIR: ${FASTAPI_DDD_TEMPLATE_LOG_DIR}
       FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: ${FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM}
       FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: ${FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME}
+      # FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${FASTAPI_DDD_TEMPLATE_JWT_SECRET}
       DB_DRIVER: ${DB_DRIVER}
       DB_USER: ${DB_USER}
+      # DB_USER_SECRET: ${DB_USER_SECRET}
       DB_PATH: ${DB_PATH}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_TABLE_SCHEMA: ${DB_TABLE_SCHEMA}
       FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: ${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG}
       FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: ${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN}
+      # FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}
     ports:
     - ${SERVER_HOST}:${SERVER_PORT}:${SERVER_PORT}
     restart: unless-stopped
@@ -87,7 +90,7 @@ services:
     - source: fastapi_ddd_template_bootstrap_admin_password_hash
       target: fastapi_ddd_template_bootstrap_admin_password_hash
     volumes:
-    - ./logs:${FASTAPI_DDD_TEMPLATE_LOG_DIR}
+    - ./logs:/fastapi_ddd_template/${FASTAPI_DDD_TEMPLATE_LOG_DIR}
 volumes:
   pgdata: {}
 secrets:

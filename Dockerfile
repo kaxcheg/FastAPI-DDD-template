@@ -20,12 +20,7 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 # copy from host to image
 COPY ./app ./app
-
-COPY ./ci-cd/entrypoint.py ./entrypoint.py
-# make ./entrypoint.py executable (+x adds execute permission)
-# RUN chmod +x ./entrypoint.py
-
-# COPY ./deploy/config_fields.json ./config_fields.json
+COPY ./entrypoint.py ./entrypoint.py
 COPY ./alembic.ini ./alembic.ini
 
 # rm -rf /var/lib/apt/lists/* cleans apt cache to reduce image size

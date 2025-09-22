@@ -1,19 +1,21 @@
 from functools import lru_cache
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import get_settings
+
 
 @lru_cache
 def get_engine():
     """Lazy singleton async engine."""
     cfg = get_settings()
     return create_async_engine(
-        str(cfg.DB_URL), 
+        str(cfg.DB_URL),
         connect_args={"server_settings": {"search_path": "app,public"}},
         echo=False,
         pool_pre_ping=True,
     )
+
 
 @lru_cache
 def get_session_factory():

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import override
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID, uuid4
 
 from app.domain.value_objects.base import ValueObject
+
 
 @dataclass(frozen=True, repr=False)
 class UserId(ValueObject):

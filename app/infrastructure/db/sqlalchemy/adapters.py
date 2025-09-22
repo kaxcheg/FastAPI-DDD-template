@@ -11,21 +11,19 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 
-from app.domain.entities.base import Repository
-from app.domain.entities.user import User
-from app.domain.entities.user.repo import UserRepository
-from app.domain.value_objects import UserId, UserPasswordHash, UserRole, Username
-from app.domain.services import IdGenerator
-
+from app.application.dto import CredentialDTO
 from app.application.exceptions import (
     DuplicateUserError,
     NotAuthenticatedError,
     NotAuthorizedError,
 )
-from app.application.dto import CredentialDTO
 from app.application.ports.services import AuthService
 from app.application.ports.uow import UnitOfWork
-
+from app.domain.entities.base import Repository
+from app.domain.entities.user import User
+from app.domain.entities.user.repo import UserRepository
+from app.domain.services import IdGenerator
+from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 from app.infrastructure.security.jwt_service import (
     JwtTokenExpired,
@@ -34,6 +32,7 @@ from app.infrastructure.security.jwt_service import (
 )
 
 type RepoFactory[R: Repository] = Callable[[AsyncSession], R]
+
 
 class UserRepositorySQL(UserRepository):
     """SQLAlchemy repository that maps Domain to ORM and back."""
@@ -55,7 +54,7 @@ class UserRepositorySQL(UserRepository):
             role=UserRole(result.role),
             is_active=result.is_active,
         )
-    
+
     @override
     async def get_by_username(self, username: Username) -> User | None:
         """Return a user by username or None."""
@@ -72,7 +71,7 @@ class UserRepositorySQL(UserRepository):
             role=UserRole(row.role),
             is_active=row.is_active,
         )
-    
+
     @override
     async def add(self, user: User) -> None:
         """Persist a new user or raise on conflict."""
@@ -89,7 +88,9 @@ class UserRepositorySQL(UserRepository):
         except IntegrityError as e:
             raise DuplicateUserError(f"User {user.username} already exists") from e
 
+
 R = TypeVar("R", bound=Repository)
+
 
 class UoWSQL(UnitOfWork):
     """Unit-of-Work adapter for async SQLAlchemy."""
@@ -145,11 +146,11 @@ class UoWSQL(UnitOfWork):
             raise KeyError(f"Repository not registered: {iface!r}") from e
 
         repo = factory(self._session)
-        
+
         # Safe cast: registry binds factory to iface type.
         from typing import cast
-        return cast(R, repo)
 
+        return cast(R, repo)
 
 
 class UUIDv4Generator(IdGenerator):
@@ -165,9 +166,11 @@ class TokenSQLAuthService(AuthService[UserRepository]):
     """Auth facade using JWT and SQL repository."""
 
     @override
-    def __init__(self, credentials: CredentialDTO, token_service: JwtTokenService) -> None:
+    def __init__(
+        self, credentials: CredentialDTO, token_service: JwtTokenService
+    ) -> None:
         """Store credentials and token service."""
-        
+
         super().__init__(credentials)
         self._token_service = token_service
 
@@ -191,13 +194,13 @@ class TokenSQLAuthService(AuthService[UserRepository]):
             raise NotAuthenticatedError("Unauthorized")
 
         return user
-    
+
     @override
-    def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole) -> None:
+    def ensure_role(
+        self, user_id: UserId, user_role: UserRole, required_role: UserRole
+    ) -> None:
         """Raise when role is insufficient."""
         # Allow ADMIN and the exact target role.
         if user_role in {UserRole.ADMIN, required_role}:
             return
         raise NotAuthorizedError("Forbidden")
-
-
