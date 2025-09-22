@@ -6,13 +6,12 @@ from types import TracebackType
 from typing import TypeVar, override
 
 from app.application.exceptions.base import ApplicationError
-
+from app.config.logging import get_logger
 from app.domain.entities.user.repo import Repository
 from app.domain.exceptions.base import DomainError
 
-from app.config.logging import get_logger
-
 R = TypeVar("R", bound=Repository)
+
 
 class UnitOfWork(AbstractAsyncContextManager, ABC):
     """Unit-of-Work abstraction around a transactional session."""
@@ -29,6 +28,7 @@ class UnitOfWork(AbstractAsyncContextManager, ABC):
     async def _close(self) -> None: ...
     @abstractmethod
     def get_repo(self, iface: type[R]) -> R: ...
+
     """
         R: Repository interface bound to this UoW.
     """

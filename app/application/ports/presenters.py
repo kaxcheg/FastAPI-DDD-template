@@ -8,11 +8,13 @@ from app.application.dto.base import DTO
 
 class State(Enum):
     """Operation result states."""
+
     OK = auto()
     ERROR = auto()
     UNAUTHORIZED = auto()
     FORBIDDEN = auto()
     CONFLICT = auto()
+
 
 @runtime_checkable
 class Presenter[D: DTO](Protocol):

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Literal, ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 # All settings live here.
 class BaseConfig(BaseSettings):
@@ -25,22 +26,24 @@ class BaseConfig(BaseSettings):
 
     DB_PATH: str
     DB_HOST: str
-    DB_PORT:int
+    DB_PORT: int
     DB_DRIVER: str
     DB_USER: str
     DB_USER_SECRET: SecretStr
-    DB_TABLE_SCHEMA:str
+    DB_TABLE_SCHEMA: str
 
     FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: bool
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN:str
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH:SecretStr
+    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: str
+    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
 
     @field_validator("FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME")
     @classmethod
     def _positive(cls, v: int) -> int:
         """Ensure token expiry is positive."""
         if v <= 0:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME must be positive")
+            raise ValueError(
+                "FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME must be positive"
+            )
         return v
 
     @property
@@ -61,6 +64,7 @@ class DevConfig(BaseConfig):
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env.dev",
+        secrets_dir="/run/secrets",
         extra="ignore",
     )
 
@@ -116,20 +120,21 @@ class ProdConfig(BaseConfig):
             raise ValueError("Invalid FASTAPI_DDD_TEMPLATE_JWT_SECRET in production")
         return v
 
+
 # Cache config instance to avoid recreating settings on every import.
 @lru_cache
 def get_settings() -> BaseConfig:
     """Return singleton config by FASTAPI_DDD_TEMPLATE_ENV."""
-    env = os.getenv(f"FASTAPI_DDD_TEMPLATE_ENV")
+    env = os.getenv("FASTAPI_DDD_TEMPLATE_ENV")
     if not env:
-        raise ValueError(f"FASTAPI_DDD_TEMPLATE_ENV cannot be empty")
+        raise ValueError("FASTAPI_DDD_TEMPLATE_ENV cannot be empty")
 
     match env.lower():
         case "dev":
-            return DevConfig()  # pyright: ignore[reportCallIssue]
+            return DevConfig()  # type: ignore[call-arg]
         case "test":
-            return TestConfig() # pyright: ignore[reportCallIssue]
+            return TestConfig()  # type: ignore[call-arg]
         case "prod":
-            return ProdConfig() # pyright: ignore[reportCallIssue]
+            return ProdConfig()  # type: ignore[call-arg]
         case _:
             raise ValueError(f"Unknown FASTAPI_DDD_TEMPLATE_ENV value: {env.lower()}")

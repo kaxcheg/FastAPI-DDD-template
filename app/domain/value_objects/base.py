@@ -18,7 +18,9 @@ class ValueObject(ABC):
             ValueObjectError: When the dataclass has no fields.
         """
         if not fields(self):
-            raise ValueObjectError(f"{type(self).__name__} must have at least one field!")
+            raise ValueObjectError(
+                f"{type(self).__name__} must have at least one field!"
+            )
 
     @override
     def __repr__(self) -> str:

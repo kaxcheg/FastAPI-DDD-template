@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import override
 from dataclasses import dataclass
+from typing import override
 
 from app.domain.exceptions import ValueObjectError
 from app.domain.value_objects.base import ValueObject
@@ -35,7 +35,7 @@ class Username(ValueObject):
     """
 
     value: str
-    
+
     @override
     def __post_init__(self) -> None:
         """Validate value length."""

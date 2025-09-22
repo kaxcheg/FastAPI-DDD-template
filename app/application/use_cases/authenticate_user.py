@@ -2,24 +2,22 @@ from __future__ import annotations
 
 from typing import Callable, override
 
-from app.domain.value_objects import Username, UserRawPassword
-from app.domain.entities.user.repo import UserRepository
-from app.domain.exceptions import ValueObjectError
-
-from app.application.ports.services import PasswordVerifier
-from app.application.ports.uow import UnitOfWork
 from app.application.dto import AuthRequestDTO, AuthResponseDTO
 from app.application.ports.presenters import Presenter
+from app.application.ports.services import PasswordVerifier
+from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import UseCase
-
 from app.config.logging import get_logger
+from app.domain.entities.user.repo import UserRepository
+from app.domain.exceptions import ValueObjectError
+from app.domain.value_objects import Username, UserRawPassword
 
 
 class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
     """Authenticate user by username and password."""
 
     logger = get_logger(__name__)
-    
+
     def __init__(
         self,
         uow_factory: Callable[[], UnitOfWork],
@@ -38,11 +36,13 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
         """Validate credentials and emit auth result."""
         try:
             async with self._uow_factory() as uow:
-                repo:UserRepository = uow.get_repo(UserRepository)
+                repo: UserRepository = uow.get_repo(UserRepository)
                 user = await repo.get_by_username(Username(dto.username))
         except ValueObjectError:
             presenter.unauthorized("Invalid credentials")
-            self.logger.warning({"event": "auth_failed", "reason": "bad_username_format"})
+            self.logger.warning(
+                {"event": "auth_failed", "reason": "bad_username_format"}
+            )
             return
 
         if user is None:
@@ -51,10 +51,14 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
             return
 
         try:
-            ok = self._password_verifier.verify(UserRawPassword(dto.raw_password), user.password_hash)
+            ok = self._password_verifier.verify(
+                UserRawPassword(dto.raw_password), user.password_hash
+            )
         except ValueObjectError:
             presenter.unauthorized("Invalid credentials")
-            self.logger.warning({"event": "auth_failed", "reason": "bad_password_format"})
+            self.logger.warning(
+                {"event": "auth_failed", "reason": "bad_password_format"}
+            )
             return
 
         if not ok:

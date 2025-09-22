@@ -3,18 +3,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.dto import AuthRequestDTO, AuthResponseDTO
 from app.application.ports.presenters import State
-
-from app.infrastructure.security.jwt_service import JwtTokenService
-
-from app.interface.http.adapters.presenters import FastAPIAuthenticationPresenter
-from app.interface.http.routes.dependencies import get_authenticate_user_uc, get_jwt_service
-from app.interface.http.schemas import Token, ErrorResponse
-from app.interface.http.utils import raise_for_presenter_400_state
-
+from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.config.logging import get_logger
+from app.infrastructure.security.jwt_service import JwtTokenService
+from app.interface.http.adapters.presenters import FastAPIAuthenticationPresenter
+from app.interface.http.routes.dependencies import (
+    get_authenticate_user_uc,
+    get_jwt_service,
+)
+from app.interface.http.schemas import ErrorResponse, Token
+from app.interface.http.utils import raise_for_presenter_400_state
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -52,7 +52,9 @@ async def login(
         token = token_service.issue(
             claims={"sub": presenter.response.user_id, "role": presenter.response.role}
         )
-        logger.info({"event": "token_created", "user_id": f"{presenter.response.user_id}"})
+        logger.info(
+            {"event": "token_created", "user_id": f"{presenter.response.user_id}"}
+        )
         return Token(access_token=token, token_type="Bearer")
 
     # Always raise on non-OK states

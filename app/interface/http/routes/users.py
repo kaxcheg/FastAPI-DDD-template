@@ -6,10 +6,13 @@ from fastapi import APIRouter, Depends, status
 from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
 from app.application.ports.presenters import State
 from app.application.use_cases.create_user import CreateUserUseCase
-
 from app.interface.http.adapters.presenters import FastAPICreateUserPresenter
 from app.interface.http.routes.dependencies import get_create_user_uc
-from app.interface.http.schemas import CreateUserRequest, CreateUserResponse, ErrorResponse
+from app.interface.http.schemas import (
+    CreateUserRequest,
+    CreateUserResponse,
+    ErrorResponse,
+)
 from app.interface.http.utils import raise_for_presenter_400_state
 
 router = APIRouter()
@@ -34,7 +37,9 @@ async def create_user(
     presenter = FastAPICreateUserPresenter()
     await uc.execute(CreateUserInputDTO(**body.model_dump(mode="python")), presenter)
 
-    if presenter.state is State.OK and isinstance(presenter.response, CreateUserOutputDTO):
+    if presenter.state is State.OK and isinstance(
+        presenter.response, CreateUserOutputDTO
+    ):
         return CreateUserResponse(**asdict(presenter.response))
 
     # Always raise for non-OK states to avoid returning None

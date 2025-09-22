@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import override
 from dataclasses import dataclass
+from typing import override
 
-from app.domain.value_objects.base import ValueObject
 from app.domain.exceptions import ValueObjectError
+from app.domain.value_objects.base import ValueObject
 from app.domain.value_objects.constants import HASH_LEN
 
 

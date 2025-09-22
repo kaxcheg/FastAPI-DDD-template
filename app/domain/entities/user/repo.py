@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from app.domain.entities.base import Repository
 from app.domain.entities.user import User
 from app.domain.value_objects import UserId, Username
-from app.domain.entities.base import Repository
 
 
 class UserRepository(Repository):
