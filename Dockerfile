@@ -6,11 +6,11 @@ WORKDIR /fastapi_ddd_template
 COPY pyproject.toml poetry.lock ./
 RUN pip install --upgrade pip
 # make sure poetry version mathes poetry.lock version
-RUN pip install --no-cache-dir poetry==1.8.2
+RUN pip install --no-cache-dir poetry==2.2.1
 # don't create virtual env
 RUN poetry config virtualenvs.create false
 # install dependecies from poetry.lock without dev and self package 
-RUN poetry install --no-dev --no-root
+RUN poetry install --without=dev --no-root
 
 # final stage: image build
 FROM python:3.12-slim
