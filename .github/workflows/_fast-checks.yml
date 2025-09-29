@@ -1,7 +1,12 @@
-name: CI fast checks
+name: _fast checks
 
 on:
   workflow_call:
+    inputs:
+      python-version:
+        description: "Python version to use"
+        required: true
+        type: string
 
 concurrency:
   group: ci-${{ github.ref }}
