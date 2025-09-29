@@ -1,0 +1,17 @@
+name: CI feature branch
+
+on:
+  push:
+    branches:
+      - "feature/**"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-fast-checks:
+    uses: ./.github/workflows/_fast-checks.yml
+    with:
+      python-version: "3.12"

@@ -1,33 +1,24 @@
-name: CI sanity check
+name: CI fast checks
 
 on:
-  push:
-    branches:
-      - '**'
-  pull_request:
-    branches:
-      - develop
-      - release/*
-      - hotfix/*
-      - main
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Basic check
+  fast-check:
     runs-on: ubuntu-latest
     env:
       ENV_FILE: ci/env.test
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ inputs.python-version }}
       - name: Cache Python packages
         uses: actions/cache@v3
         with:
@@ -42,8 +33,6 @@ jobs:
           poetry install
       - name: Lint & Static Analysis
         run: make lint
-      - name: Build Docker images
-        run: make build
       - name: Run Unit Tests
         run: poetry run make test-unit
 

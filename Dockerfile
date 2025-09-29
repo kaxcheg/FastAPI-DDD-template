@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir poetry==2.2.1
 # don't create virtual env
 RUN poetry config virtualenvs.create false
 # install dependecies from poetry.lock without dev and self package 
-RUN poetry install --no-dev --no-root
+RUN poetry install --without=dev --no-root
 
 # final stage: image build
 FROM python:3.12-slim
