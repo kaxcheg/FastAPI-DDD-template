@@ -1,0 +1,51 @@
+name: CI sanity check
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - develop
+      - release/*
+      - hotfix/*
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Basic check
+    runs-on: ubuntu-latest
+    env:
+      ENV_FILE: ci/env.test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Cache Python packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-2.2.1-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-2.2.1
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry==2.2.1
+          poetry install
+      - name: Lint & Static Analysis
+        run: make lint
+      - name: Build Docker images
+        run: make build
+      - name: Run Unit Tests
+        run: poetry run make test-unit
+
+
+

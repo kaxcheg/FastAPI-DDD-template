@@ -26,7 +26,7 @@ class BaseConfig(BaseSettings):
 
     DB_PATH: str
     DB_HOST: str
-    DB_PORT: int
+    DB_PORT: int = 5432
     DB_DRIVER: str
     DB_USER: str
     DB_USER_SECRET: SecretStr
