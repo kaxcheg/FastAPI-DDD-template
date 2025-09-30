@@ -38,7 +38,7 @@ LOAD_LOCAL ?= true
 
 # docker-compose / env
 COMPOSE_FILE ?= ./dev/docker-compose.yml
-ENV_FILE ?= ./dev/.env.dev
+ENV_FILE ?= ./dev/env.dev
 
 # Tests
 PYTEST ?= pytest
