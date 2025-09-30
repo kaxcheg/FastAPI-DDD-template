@@ -38,7 +38,6 @@ package-mode = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--envfile .env.dev"
 
 [tool.isort]
 profile = "black"

@@ -20,7 +20,7 @@ jobs:
         python-version: "3.12"
   
   build-and-integration-tests:
-    name: Basic check
+    name: Build image and run integration checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

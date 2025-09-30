@@ -53,12 +53,11 @@ def main() -> int:
     if not host:
         raise RuntimeError(f"[entrypoint] {db_host_key} is not set")
 
-    if not db_port_key:
-        raise RuntimeError("[entrypoint] DB_HOST is not set")
 
-    port = os.getenv(db_port_key)
-    if not port:
-        raise RuntimeError(f"[entrypoint] {db_port_key} is not set")
+    if not db_port_key:
+        port = 5432
+    else:
+        port = os.getenv(db_port_key, 5432)
 
     wait_for_db(host, int(port), 60)
     run_cmd(["alembic", "upgrade", "head"])
