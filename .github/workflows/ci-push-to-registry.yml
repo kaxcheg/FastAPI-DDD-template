@@ -17,7 +17,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository | toLower }}
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -30,6 +30,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Lowercase IMAGE_NAME
+        run: echo "IMAGE_NAME=${IMAGE_NAME,,}" >> $GITHUB_ENV
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
       - name: Derive version from branch (release/x.y.z)
         id: meta
         run: |
@@ -39,7 +44,6 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
@@ -59,6 +63,8 @@ jobs:
           platforms: linux/amd64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           provenance: false
           sbom: false
 
