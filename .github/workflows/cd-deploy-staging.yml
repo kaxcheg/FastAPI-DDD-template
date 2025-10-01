@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: cd-${{ github.ref }}
+  group: cd-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -35,19 +35,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       # --- Create KinD cluster inside runner ---
       - name: Create KinD cluster
         uses: helm/kind-action@v1.10.0
         with:
           cluster_name: staging
-          wait: true
+          node_image: kindest/node:v1.33.4
+          wait: 180s
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: latest
+          version: v1.33.4
 
       - name: Login to GHCR (pull image locally)
         uses: docker/login-action@v3
@@ -74,7 +75,7 @@ jobs:
             echo "Invalid digest in file: $DIGEST"; exit 1
           fi
 
-          IMAGE_BY_DIGEST="${REGISTRY}/${{env.IMAGE_NAME}}@${DIGEST}"
+          IMAGE_BY_DIGEST="${REGISTRY}/${{IMAGE_NAME}}@${DIGEST}"
           echo "Using IMAGE=${IMAGE_BY_DIGEST}"
           docker pull "${IMAGE_BY_DIGEST}"
 
@@ -82,7 +83,7 @@ jobs:
           if ! kind load docker-image "${IMAGE_BY_DIGEST}" --name staging; then
             # Fallback: локально ретегнуть во временный тег и загрузить по тегу
             TMP_TAG="tmp-${DIGEST#sha256:}"
-            IMAGE_WITH_TAG="${REGISTRY}/${{env.IMAGE_NAME}}:${TMP_TAG}"
+            IMAGE_WITH_TAG="${REGISTRY}/${{IMAGE_NAME}}:${TMP_TAG}"
             docker tag "${IMAGE_BY_DIGEST}" "${IMAGE_WITH_TAG}"
             kind load docker-image "${IMAGE_WITH_TAG}" --name staging
           fi
@@ -91,6 +92,9 @@ jobs:
       # --- Namespace ---
       - name: Apply namespace
         run: kubectl apply -f deploy/k8s/staging/namespace.yaml
+
+      - name: Install envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext-base
 
       # --- Render and apply ConfigMap from GitHub Environment VARS ---
       - name: Render & apply configmap.yaml (envsubst from vars)
@@ -203,7 +207,11 @@ jobs:
           kubectl -n staging set image deploy/fastapi-ddd-template-api api="${IMAGE}"
           kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
 
-      # --- Optional: stub tests on staging cluster (no ingress required) ---
+      - name: Health check API
+        run: |
+          kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
+          kubectl -n staging get svc
+
       - name: Smoke / Integration / E2E (stubs)
         run: |
           make test-smoke
