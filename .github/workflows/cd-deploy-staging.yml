@@ -4,7 +4,11 @@ on:
   workflow_run:
     workflows: ["CI build & push to registry"]
     types: [completed]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: "run_id CI run_id for digest"
+        required: true
 
 concurrency:
   group: cd-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
@@ -57,12 +61,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download digest artifact from triggering run
+      - name: Download digest artifact
+        if: ${{ github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch' }}
         uses: dawidd6/action-download-artifact@v6
         with:
-          run_id: ${{ github.event.workflow_run.id }}
+          run_id: ${{ (github.event_name == 'workflow_run') && github.event.workflow_run.id || inputs.ci_run_id }}
           name: digest
           path: .
+
 
       - name: Set lowercase IMAGE_NAME
         run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
