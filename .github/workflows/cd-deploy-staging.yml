@@ -16,7 +16,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   
@@ -63,8 +63,8 @@ jobs:
           run_id: ${{ github.event.workflow_run.id }}
           name: digest
           path: .
-      - name: Lowercase IMAGE_NAME
-        shell: bash
+
+      - name: Set lowercase IMAGE_NAME
         run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Pull image by digest & load into KinD
@@ -75,7 +75,7 @@ jobs:
             echo "Invalid digest in file: $DIGEST"; exit 1
           fi
 
-          IMAGE_BY_DIGEST="${REGISTRY}/${{IMAGE_NAME}}@${DIGEST}"
+          IMAGE_BY_DIGEST="${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
           echo "Using IMAGE=${IMAGE_BY_DIGEST}"
           docker pull "${IMAGE_BY_DIGEST}"
 
@@ -83,7 +83,7 @@ jobs:
           if ! kind load docker-image "${IMAGE_BY_DIGEST}" --name staging; then
             # Fallback: локально ретегнуть во временный тег и загрузить по тегу
             TMP_TAG="tmp-${DIGEST#sha256:}"
-            IMAGE_WITH_TAG="${REGISTRY}/${{IMAGE_NAME}}:${TMP_TAG}"
+            IMAGE_WITH_TAG="${REGISTRY}/${IMAGE_NAME}:${TMP_TAG}"
             docker tag "${IMAGE_BY_DIGEST}" "${IMAGE_WITH_TAG}"
             kind load docker-image "${IMAGE_WITH_TAG}" --name staging
           fi
