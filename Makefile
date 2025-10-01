@@ -196,10 +196,21 @@ test-unit:
 	@echo "Running unit tests via pytest in $(TEST_DIR)..."
 	$(PYTEST) $(TEST_DIR) --envfile=$(ENV_FILE) -q
 
-# Integration tests placeholder (stub)
-test-int:
-	@echo "Integration tests placeholder - implement actual integration suite."
-	@echo "This target is a stub used by CI to differentiate e2e/integration steps."
+# CI integration tests placeholder (stub)
+test-int-ci:
+	@echo "Fast CI integration tests placeholder - implement actual integration suite."
+
+# Staging integration tests placeholder (stub)
+test-int-staging:
+	@echo "Staging integration tests placeholder - implement actual integration suite."
+
+# Smoke tests placeholder (stub)
+test-smoke:
+	@echo "Smoke tests placeholder - implement actual smoke suite."
+
+# e2e tests placeholder (stub)
+test-e2e:
+	@echo "e2e tests placeholder - implement actual e2e suite."
 
 lint:
 	@echo "Running linters (if installed)..."
