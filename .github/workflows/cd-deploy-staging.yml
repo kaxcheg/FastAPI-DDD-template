@@ -1,0 +1,219 @@
+name: CD deploy to staging
+
+on:
+  workflow_run:
+    workflows: ["CI build & push to registry"]
+    types: [completed]
+  workflow_dispatch: {}
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  
+  deploy:
+    if: >
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      }}
+    name: Deploy to Staging (KinD)
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      IMAGE_TAG: staging-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # --- Create KinD cluster inside runner ---
+      - name: Create KinD cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: staging
+          wait: true
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Login to GHCR (pull image locally)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download digest artifact from triggering run
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+          name: digest
+          path: .
+      - name: Lowercase IMAGE_NAME
+        shell: bash
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Pull image by digest & load into KinD
+        run: |
+          set -euo pipefail
+          DIGEST="$(tr -d '\n' < image_digest_*.txt)"
+          if ! echo "$DIGEST" | grep -q '^sha256:'; then
+            echo "Invalid digest in file: $DIGEST"; exit 1
+          fi
+
+          IMAGE_BY_DIGEST="${REGISTRY}/${{env.IMAGE_NAME}}@${DIGEST}"
+          echo "Using IMAGE=${IMAGE_BY_DIGEST}"
+          docker pull "${IMAGE_BY_DIGEST}"
+
+          # Попытаться загрузить в KinD по digest-референсу
+          if ! kind load docker-image "${IMAGE_BY_DIGEST}" --name staging; then
+            # Fallback: локально ретегнуть во временный тег и загрузить по тегу
+            TMP_TAG="tmp-${DIGEST#sha256:}"
+            IMAGE_WITH_TAG="${REGISTRY}/${{env.IMAGE_NAME}}:${TMP_TAG}"
+            docker tag "${IMAGE_BY_DIGEST}" "${IMAGE_WITH_TAG}"
+            kind load docker-image "${IMAGE_WITH_TAG}" --name staging
+          fi
+
+
+      # --- Namespace ---
+      - name: Apply namespace
+        run: kubectl apply -f deploy/k8s/staging/namespace.yaml
+
+      # --- Render and apply ConfigMap from GitHub Environment VARS ---
+      - name: Render & apply configmap.yaml (envsubst from vars)
+        run: |
+          # export all STAGING_* vars used by configmap.yaml
+          export $(printf "%s " \
+            STAGING_FASTAPI_DDD_TEMPLATE_ENV \
+            STAGING_FASTAPI_DDD_TEMPLATE_DEBUG \
+            STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR \
+            STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM \
+            STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME \
+            STAGING_SERVER_PORT \
+            STAGING_DB_ADMIN \
+            STAGING_DB_PATH \
+            STAGING_DB_DRIVER \
+            STAGING_DB_USER \
+            STAGING_DB_TABLE_SCHEMA \
+            STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG \
+            STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN \
+            STAGING_POSTGRES_PASSWORD_FILE \
+            STAGING_DB_ADMIN_PWD_FILE \
+            STAGING_DB_USER_PWD_FILE \
+          ) >/dev/null 2>&1 || true
+
+          # Если в вашем configmap.yaml используются плейсхолдеры ${STAGING_*}, envsubst их подставит.
+          # Если пути к файлам уже заданы константами — это тоже ок.
+          envsubst < deploy/k8s/staging/configmap.yaml | kubectl apply -f -
+
+        env:
+          # App (non-secrets)
+          STAGING_FASTAPI_DDD_TEMPLATE_ENV: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_ENV }}
+          STAGING_FASTAPI_DDD_TEMPLATE_DEBUG: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_DEBUG }}
+          STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR }}
+          STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM }}
+          STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME }}
+          STAGING_SERVER_PORT: ${{ vars.STAGING_SERVER_PORT }}
+          # DB (non-secrets)
+          STAGING_DB_ADMIN: ${{ vars.STAGING_DB_ADMIN }}
+          STAGING_DB_PATH: ${{ vars.STAGING_DB_PATH }}
+          STAGING_DB_DRIVER: ${{ vars.STAGING_DB_DRIVER }}
+          STAGING_DB_USER: ${{ vars.STAGING_DB_USER }}
+          STAGING_DB_TABLE_SCHEMA: ${{ vars.STAGING_DB_TABLE_SCHEMA }}
+          # Bootstrap flags (non-secrets)
+          STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG }}
+          STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN }}
+          # File-path vars (non-secrets) — if you keep them as placeholders in configmap.yaml
+          STAGING_POSTGRES_PASSWORD_FILE: ${{ vars.STAGING_POSTGRES_PASSWORD_FILE }}
+          STAGING_DB_ADMIN_PWD_FILE: ${{ vars.STAGING_DB_ADMIN_PWD_FILE }}
+          STAGING_DB_USER_PWD_FILE: ${{ vars.STAGING_DB_USER_PWD_FILE }}
+
+      # --- Create/Update K8s Secret from GitHub Environment SECRETS ---
+      - name: Create/Update fastapi-ddd-template-secrets
+        env:
+          STAGING_DB_ADMIN_PASSWORD: ${{ secrets.STAGING_DB_ADMIN_PASSWORD }}
+          STAGING_DB_USER_PASSWORD: ${{ secrets.STAGING_DB_USER_PASSWORD }}
+          STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
+          STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
+        run: |
+          kubectl -n staging apply -f - <<'YAML'
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: fastapi-ddd-template-secrets
+            namespace: staging
+          type: Opaque
+          stringData:
+            DB_ADMIN_PASSWORD: "${STAGING_DB_ADMIN_PASSWORD}"
+            DB_USER_PASSWORD: "${STAGING_DB_USER_PASSWORD}"
+            FASTAPI_DDD_TEMPLATE_JWT_SECRET: "${STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET}"
+            FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
+          YAML
+
+      # --- DB (Deployment + Service) ---
+      - name: Apply DB manifests & wait rollout
+        run: |
+          kubectl apply -f deploy/k8s/staging/deployment-db.yaml
+          kubectl -n staging rollout status deploy/db --timeout=180s
+
+      # --- Bootstrap script as ConfigMap from repo file ---
+      - name: Create ConfigMap with bootstrap_db.sh
+        run: |
+          kubectl -n staging create configmap db-bootstrap-scripts \
+            --from-file=bootstrap_db.sh=deploy/bootstrap/bootstrap_db.sh \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # --- DB bootstrap job (depends on DB healthy via initContainer) ---
+      - name: Run DB bootstrap & wait complete
+        run: |
+          kubectl apply -f deploy/k8s/staging/job-db-bootstrap.yaml
+          kubectl -n staging wait --for=condition=complete job/db-bootstrap --timeout=300s
+          kubectl -n staging logs job/db-bootstrap --tail=-1 || true
+
+      # --- API (Deployment + Service) ---
+      - name: Patch API container port if SERVER_PORT != 8000
+        if: ${{ vars.STAGING_SERVER_PORT && vars.STAGING_SERVER_PORT != '8000' }}
+        run: |
+          PORT="${{ vars.STAGING_SERVER_PORT }}"
+          # На скорую руку подменим 8000 на фактический порт (containerPort, probes, service targetPort)
+          sed -i "s/containerPort: 8000/containerPort: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
+          sed -i "s/port: 8000/port: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
+          sed -i "s/targetPort: 8000/targetPort: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
+
+      - name: Apply API manifests
+        run: kubectl apply -f deploy/k8s/staging/deployment-fastapi-api.yaml
+
+      - name: Set API image by digest & wait
+        run: |
+          DIGEST="$(tr -d '\n' < image_digest_*.txt)"
+          IMAGE="${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+          kubectl -n staging set image deploy/fastapi-ddd-template-api api="${IMAGE}"
+          kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
+
+      # --- Optional: stub tests on staging cluster (no ingress required) ---
+      - name: Smoke / Integration / E2E (stubs)
+        run: |
+          make test-smoke
+          make test-int-staging
+          make test-e2e
+
+      - name: On failure dump k8s state
+        if: failure()
+        run: |
+          kubectl -n staging get all
+          kubectl -n staging describe pods
+          kubectl -n staging logs -l app=db --tail=200 || true
+          kubectl -n staging logs -l app=fastapi-ddd-template-api --tail=200 || true

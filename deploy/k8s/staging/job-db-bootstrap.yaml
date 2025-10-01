@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-bootstrap
+  namespace: staging
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-db-ready
+        image: postgres:16
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            until pg_isready -h "$DB_HOST" -U "$DB_ADMIN" -d "$DB_PATH" -t 1; do
+              echo "waiting for db..."; sleep 2;
+            done
+        env:
+        - name: DB_HOST
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_HOST } }
+        - name: DB_ADMIN
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_ADMIN } }
+        - name: DB_PATH
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_PATH } }
+      containers:
+      - name: bootstrap
+        image: postgres:16
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash","-lc","bash /bootstrap/bootstrap_db.sh"]
+        env:
+        - name: DB_HOST
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_HOST } }
+        - name: DB_ADMIN
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_ADMIN } }
+        - name: DB_ADMIN_PWD_FILE
+          value: /run/secrets/db_admin_secret_file
+        - name: DB_PATH
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_PATH } }
+        - name: DB_USER
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_USER } }
+        - name: DB_USER_PWD_FILE
+          value: /run/secrets/db_user_secret_file
+        - name: DB_TABLE_SCHEMA
+          valueFrom: { configMapKeyRef: { name: fastapi-ddd-template-config, key: DB_TABLE_SCHEMA } }
+        volumeMounts:
+        - name: bootstrap
+          mountPath: /bootstrap
+          readOnly: true
+        - name: db-bootstrap-secrets
+          mountPath: /run/secrets
+          readOnly: true
+      volumes:
+      - name: bootstrap
+        configMap:
+          name: db-bootstrap-scripts
+          defaultMode: 0555
+      - name: db-bootstrap-secrets
+        secret:
+          secretName: fastapi-ddd-template-secrets
+          items:
+          - key: DB_ADMIN_SECRET
+            path: db_admin_secret_file
+          - key: DB_USER_SECRET
+            path: db_user_secret_file
