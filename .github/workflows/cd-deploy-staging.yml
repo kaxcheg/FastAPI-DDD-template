@@ -7,7 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       ci_run_id:
-        description: "run_id CI run_id for digest"
+        description: "CI run_id for digest"
+        required: true
+      app_version:
+        description: "app version"
         required: true
 
 concurrency:
@@ -17,141 +20,111 @@ concurrency:
 permissions:
   contents: read
   packages: read
+  actions: read
 
 env:
   REGISTRY: ghcr.io
-  # IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  
-  deploy:
+  deploy-staging:
     if: >
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-      }}
-    name: Deploy to Staging (KinD)
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: staging
     env:
-      IMAGE_TAG: staging-${{ github.sha }}
+      HELM_RELEASE: fastapi-ddd-template-api
+      NAMESPACE: staging
+      # IMAGE_REPOSITORY: placeholder
+      # если CI тегирует как staging-<sha>, можно хранить для fallback
+      # IMAGE_TAG: staging-${{ github.sha }}
+      # APP_VERSION: ${{ startsWith(github.ref_name, 'release/') && replace(github.ref_name, 'release/', '') || inputs.app_version }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      # --- Create KinD cluster inside runner ---
-      - name: Create KinD cluster
-        uses: helm/kind-action@v1.10.0
-        with:
-          cluster_name: staging
-          node_image: kindest/node:v1.33.4
-          wait: 180s
-
-      - name: Setup kubectl
+      - name: Install kubectl
         uses: azure/setup-kubectl@v4
-        with:
-          version: v1.33.4
 
-      - name: Login to GHCR (pull image locally)
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Helm
+        uses: azure/setup-helm@v4
 
-      - name: Download digest artifact
+      - name: Create KinD cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+
+      - name: Download digest artifact (if provided)
         if: ${{ github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch' }}
-        uses: dawidd6/action-download-artifact@v6
+        uses: actions/download-artifact@v4
         with:
-          run_id: ${{ (github.event_name == 'workflow_run') && github.event.workflow_run.id || inputs.ci_run_id }}
-          name: digest
+          name: image-digest
           path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.ci_run_id }}
 
-
-      - name: Set lowercase IMAGE_NAME
-        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-
-      - name: Pull image by digest & load into KinD
+      - name: Read digest from artifact (if exists)
+        id: read_digest
+        shell: bash
         run: |
-          set -euo pipefail
-          DIGEST="$(tr -d '\n' < image_digest_*.txt)"
-          if ! echo "$DIGEST" | grep -q '^sha256:'; then
-            echo "Invalid digest in file: $DIGEST"; exit 1
+          if [ -f image-digest.txt ]; then
+            DIGEST=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
+            echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           fi
 
-          IMAGE_BY_DIGEST="${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
-          echo "Using IMAGE=${IMAGE_BY_DIGEST}"
-          docker pull "${IMAGE_BY_DIGEST}"
+      # --- Fallback (вариант B): вычислить digest по тегу через skopeo
+      # - name: Fallback resolve digest via skopeo
+      #   if: ${{ steps.read_digest.outputs.digest == '' }}
+      #   run: |
+      #     sudo apt-get update -y && sudo apt-get install -y skopeo jq
+      #     D=$(skopeo inspect docker://$IMAGE_REPOSITORY:$IMAGE_TAG | jq -r .Digest | sed 's/^sha256://')
+      #     echo "$D" > image-digest.txt
 
-          # Попытаться загрузить в KinD по digest-референсу
-          if ! kind load docker-image "${IMAGE_BY_DIGEST}" --name staging; then
-            # Fallback: локально ретегнуть во временный тег и загрузить по тегу
-            TMP_TAG="tmp-${DIGEST#sha256:}"
-            IMAGE_WITH_TAG="${REGISTRY}/${IMAGE_NAME}:${TMP_TAG}"
-            docker tag "${IMAGE_BY_DIGEST}" "${IMAGE_WITH_TAG}"
-            kind load docker-image "${IMAGE_WITH_TAG}" --name staging
+      - name: Export IMAGE_DIGEST
+        id: export_digest
+        run: |
+          if [ -s image-digest.txt ]; then
+            D=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
+            echo "IMAGE_DIGEST=$D" >> $GITHUB_ENV
+            echo "Digest resolved: $D"
+          else
+            echo "No digest found" >&2
+            exit 1
           fi
 
+      # --- imagePullSecret для GHCR (если частный образ)
+      # - name: Create/Update GHCR pull secret
+      #   if: ${{ secrets.GHCR_PAT != '' }}
+      #   run: |
+      #     kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+      #     kubectl -n "$NAMESPACE" create secret docker-registry ghcr \
+      #       --docker-server=ghcr.io \
+      #       --docker-username="${{ secrets.GHCR_USER || github.actor }}" \
+      #       --docker-password="${{ secrets.GHCR_PAT }}" \
+      #       --dry-run=client -o yaml | kubectl apply -f -
 
-      # --- Namespace ---
-      - name: Apply namespace
-        run: kubectl apply -f deploy/k8s/staging/namespace.yaml
+      # - name: Derive APP_VERSION from release branch
+      #   if: startsWith(github.ref_name, 'release/')
+      #   run: |
+      #     APP_VERSION="${GITHUB_REF_NAME#release/}"
+      #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
-      - name: Install envsubst
-        run: sudo apt-get update && sudo apt-get install -y gettext-base
+      # - name: Derive APP_VERSION from input
+      #   if: ${{ !startsWith(github.ref_name, 'release/') }}
+      #   run: |
+      #     APP_VERSION=${{ inputs.app_version }}
+      #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
-      # --- Render and apply ConfigMap from GitHub Environment VARS ---
-      - name: Render & apply configmap.yaml (envsubst from vars)
-        run: |
-          # export all STAGING_* vars used by configmap.yaml
-          export $(printf "%s " \
-            STAGING_FASTAPI_DDD_TEMPLATE_ENV \
-            STAGING_FASTAPI_DDD_TEMPLATE_DEBUG \
-            STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR \
-            STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM \
-            STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME \
-            STAGING_SERVER_PORT \
-            STAGING_DB_ADMIN \
-            STAGING_DB_PATH \
-            STAGING_DB_DRIVER \
-            STAGING_DB_USER \
-            STAGING_DB_TABLE_SCHEMA \
-            STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG \
-            STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN \
-            STAGING_POSTGRES_PASSWORD_FILE \
-            STAGING_DB_ADMIN_PWD_FILE \
-            STAGING_DB_USER_PWD_FILE \
-          ) >/dev/null 2>&1 || true
+      - name: Ensure namespace exists
+        run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-          # Если в вашем configmap.yaml используются плейсхолдеры ${STAGING_*}, envsubst их подставит.
-          # Если пути к файлам уже заданы константами — это тоже ок.
-          envsubst < deploy/k8s/staging/configmap.yaml | kubectl apply -f -
 
-        env:
-          # App (non-secrets)
-          STAGING_FASTAPI_DDD_TEMPLATE_ENV: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_ENV }}
-          STAGING_FASTAPI_DDD_TEMPLATE_DEBUG: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_DEBUG }}
-          STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_LOG_DIR }}
-          STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM }}
-          STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME }}
-          STAGING_SERVER_PORT: ${{ vars.STAGING_SERVER_PORT }}
-          # DB (non-secrets)
-          STAGING_DB_ADMIN: ${{ vars.STAGING_DB_ADMIN }}
-          STAGING_DB_PATH: ${{ vars.STAGING_DB_PATH }}
-          STAGING_DB_DRIVER: ${{ vars.STAGING_DB_DRIVER }}
-          STAGING_DB_USER: ${{ vars.STAGING_DB_USER }}
-          STAGING_DB_TABLE_SCHEMA: ${{ vars.STAGING_DB_TABLE_SCHEMA }}
-          # Bootstrap flags (non-secrets)
-          STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG }}
-          STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: ${{ vars.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN }}
-          # File-path vars (non-secrets) — if you keep them as placeholders in configmap.yaml
-          STAGING_POSTGRES_PASSWORD_FILE: ${{ vars.STAGING_POSTGRES_PASSWORD_FILE }}
-          STAGING_DB_ADMIN_PWD_FILE: ${{ vars.STAGING_DB_ADMIN_PWD_FILE }}
-          STAGING_DB_USER_PWD_FILE: ${{ vars.STAGING_DB_USER_PWD_FILE }}
+      # --- Helm upgrade --install с digest
 
-      # --- Create/Update K8s Secret from GitHub Environment SECRETS ---
+      # Create/Update Secret из GitHub Secrets
       - name: Create/Update fastapi-ddd-template-secrets
         env:
           STAGING_DB_ADMIN_PASSWORD: ${{ secrets.STAGING_DB_ADMIN_PASSWORD }}
@@ -159,7 +132,7 @@ jobs:
           STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
           STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
         run: |
-          kubectl -n staging apply -f - <<'YAML'
+          kubectl -n staging apply -f - <<YAML
           apiVersion: v1
           kind: Secret
           metadata:
@@ -173,50 +146,42 @@ jobs:
             FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
           YAML
 
-      # --- DB (Deployment + Service) ---
-      - name: Apply DB manifests & wait rollout
-        run: |
-          kubectl apply -f deploy/k8s/staging/deployment-db.yaml
-          kubectl -n staging rollout status deploy/db --timeout=180s
+      - name: Set IMAGE_REPOSITORY (lowercased)
+        run: echo "IMAGE_REPOSITORY=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      # --- Bootstrap script as ConfigMap from repo file ---
-      - name: Create ConfigMap with bootstrap_db.sh
+      - name: Derive APP_VERSION
         run: |
-          kubectl -n staging create configmap db-bootstrap-scripts \
-            --from-file=bootstrap_db.sh=deploy/bootstrap/bootstrap_db.sh \
-            --dry-run=client -o yaml | kubectl apply -f -
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          if [[ "$BRANCH" == release/* ]]; then
+            echo "APP_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
+          else
+            echo "APP_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
+          fi
 
-      # --- DB bootstrap job (depends on DB healthy via initContainer) ---
-      - name: Run DB bootstrap & wait complete
+
+      - name: Helm upgrade (staging)
         run: |
-          kubectl apply -f deploy/k8s/staging/job-db-bootstrap.yaml
-          kubectl -n staging wait --for=condition=complete job/db-bootstrap --timeout=300s
-          kubectl -n staging logs job/db-bootstrap --tail=-1 || true
+          helm upgrade --install "$HELM_RELEASE" deploy/helm/fastapi-ddd-template-api \
+            --namespace "$NAMESPACE" --create-namespace \
+            -f deploy/helm/fastapi-ddd-template-api/values-staging.yaml \
+            --set image.repository="$IMAGE_REPOSITORY" \
+            --set image.digest="$IMAGE_DIGEST" \
+            --set app.version="$APP_VERSION" \
+          $( [ -n "${{ secrets.GHCR_PAT }}" ] && echo "--set image.pullSecrets[0].name=ghcr" )
 
-      # --- API (Deployment + Service) ---
-      - name: Patch API container port if SERVER_PORT != 8000
-        if: ${{ vars.STAGING_SERVER_PORT && vars.STAGING_SERVER_PORT != '8000' }}
+      - name: Wait rollout
         run: |
-          PORT="${{ vars.STAGING_SERVER_PORT }}"
-          # На скорую руку подменим 8000 на фактический порт (containerPort, probes, service targetPort)
-          sed -i "s/containerPort: 8000/containerPort: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
-          sed -i "s/port: 8000/port: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
-          sed -i "s/targetPort: 8000/targetPort: ${PORT}/" deploy/k8s/staging/deployment-fastapi-api.yaml || true
-
-      - name: Apply API manifests
-        run: kubectl apply -f deploy/k8s/staging/deployment-fastapi-api.yaml
-
-      - name: Set API image by digest & wait
-        run: |
-          DIGEST="$(tr -d '\n' < image_digest_*.txt)"
-          IMAGE="${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
-          kubectl -n staging set image deploy/fastapi-ddd-template-api api="${IMAGE}"
-          kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
-
-      - name: Health check API
-        run: |
-          kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
-          kubectl -n staging get svc
+          kubectl -n "$NAMESPACE" rollout status deploy/$HELM_RELEASE --timeout=120s
+          kubectl -n "$NAMESPACE" get pods,svc -o wide
+          
+      # - name: Health check API
+      #   run: |
+      #     kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
+      #     kubectl -n staging get svc
 
       - name: Smoke / Integration / E2E (stubs)
         run: |
