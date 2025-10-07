@@ -1,0 +1,60 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: "placeholder"
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: [] # [{ name: ghcr }]
+
+podLabels: {}
+podAnnotations: {}
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+  labels: {}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+config:
+  enabled: true
+  existingName: ""  
+  data: {}
+
+extraEnv: []
+
+# values.yaml
+secrets:
+  enabled: false          # секрет НЕ создаём из Helm (создаётся вне чарта)
+  existingName: ""        # имя уже созданного секрета (задать в env-ярдах)
+  revision: ""            # опционально: маркер для rollout (меняем из CD)
+
+probes:
+  liveness:
+    enabled: true
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readiness:
+    enabled: true
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+app:
+  version: ""

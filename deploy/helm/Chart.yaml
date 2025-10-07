@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fastapi-ddd-template-api
+description: FastAPI DDD Template API
+type: application
+version: 0.0.1
+appVersion: ""

@@ -1,0 +1,13 @@
+{{- if .Values.config.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fastapi-ddd-template-api.configName" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "fastapi-ddd-template-api.fullname" . }}
+data:
+  {{- /* Принудительно кавычим все значения, чтобы не было auto-bool/чисел */ -}}
+  {{- range $k, $v := .Values.config.data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}
