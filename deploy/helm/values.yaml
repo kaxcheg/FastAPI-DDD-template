@@ -37,7 +37,7 @@ extraEnv: []
 # values.yaml
 secrets:
   enabled: false          # секрет НЕ создаём из Helm (создаётся вне чарта)
-  existingName: ""        # имя уже созданного секрета (задать в env-ярдах)
+  existingName: "fastapi-ddd-template-secrets"        # имя уже созданного секрета (задать в env-ярдах)
   revision: ""            # опционально: маркер для rollout (меняем из CD)
 
 probes:

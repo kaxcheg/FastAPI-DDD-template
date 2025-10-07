@@ -61,19 +61,21 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch' }}
         uses: actions/download-artifact@v4
         with:
-          name: image-digest
+          name: digest
           path: .
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.ci_run_id }}
 
-      - name: Read digest from artifact (if exists)
-        id: read_digest
-        shell: bash
+      - name: Read digest from artifact (if exists) and export
+        id: read_export_digest
         run: |
-          if [ -f image-digest.txt ]; then
-            DIGEST=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
-            echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          D=$(cat image_digest_*.txt | tr -d '\n') 
+          if ! echo "$D" | grep -q '^sha256:'; then
+            echo "Invalid digest in file: $D"; exit 1
           fi
+          DIGEST="$(echo "$D" | sed 's/^sha256://')"
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
+          echo "Digest resolved: $DIGEST"
 
       # --- Fallback (вариант B): вычислить digest по тегу через skopeo
       # - name: Fallback resolve digest via skopeo
@@ -83,17 +85,17 @@ jobs:
       #     D=$(skopeo inspect docker://$IMAGE_REPOSITORY:$IMAGE_TAG | jq -r .Digest | sed 's/^sha256://')
       #     echo "$D" > image-digest.txt
 
-      - name: Export IMAGE_DIGEST
-        id: export_digest
-        run: |
-          if [ -s image-digest.txt ]; then
-            D=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
-            echo "IMAGE_DIGEST=$D" >> $GITHUB_ENV
-            echo "Digest resolved: $D"
-          else
-            echo "No digest found" >&2
-            exit 1
-          fi
+      # - name: Export IMAGE_DIGEST
+      #   id: export_digest
+      #   run: |
+      #     if [ -s image-digest.txt ]; then
+      #       D=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
+      #       echo "IMAGE_DIGEST=$D" >> $GITHUB_ENV
+      #       echo "Digest resolved: $D"
+      #     else
+      #       echo "No digest found" >&2
+      #       exit 1
+      #     fi
 
       # --- imagePullSecret для GHCR (если частный образ)
       # - name: Create/Update GHCR pull secret
