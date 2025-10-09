@@ -20,6 +20,7 @@ spec:
         {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
         app.kubernetes.io/component: "api"
     spec:
+      automountServiceAccountToken: false
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
       {{- range .Values.image.pullSecrets }}
