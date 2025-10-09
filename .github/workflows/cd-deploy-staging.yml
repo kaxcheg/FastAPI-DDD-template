@@ -123,10 +123,10 @@ jobs:
             --set app.version="$APP_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
-      - name: Wait rollout (staging: db ➜ db-bootstrap ➜ api)
+      - name: Wait rollout
         shell: bash
         run: |
-        
+
           set -euo pipefail
 
           echo "⏳ Waiting for DB Deployment..."
