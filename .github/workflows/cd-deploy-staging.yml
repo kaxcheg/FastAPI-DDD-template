@@ -126,6 +126,7 @@ jobs:
       - name: Wait rollout (staging: db ➜ db-bootstrap ➜ api)
         shell: bash
         run: |
+        
           set -euo pipefail
 
           echo "⏳ Waiting for DB Deployment..."
@@ -148,6 +149,7 @@ jobs:
           kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods \
             -l app.kubernetes.io/instance="$RELEASE" -o wide
 
+        
       - name: Smoke / Integration / E2E (stubs)
         run: |
           make test-smoke
