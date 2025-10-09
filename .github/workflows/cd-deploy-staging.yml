@@ -207,12 +207,3 @@ jobs:
             kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
           done
           echo "::endgroup::"
-
-
-      - name: On failure dump k8s state
-        if: failure()
-        run: |
-          kubectl -n staging get all
-          kubectl -n staging describe pods
-          kubectl -n staging logs -l app=db --tail=200 || true
-          kubectl -n staging logs -l app=api --tail=200 || true
