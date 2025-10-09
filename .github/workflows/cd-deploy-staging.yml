@@ -153,6 +153,62 @@ jobs:
           make test-int-staging
           make test-e2e
 
+      - name: Get logs on failure (db ▸ db-bootstrap ▸ api)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "::group::Summary of resources"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods -l app.kubernetes.io/instance="$RELEASE" -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.metadata.creationTimestamp | tail -n 200 || true
+          echo "::endgroup::"
+
+          echo "::group::DB: describe & logs"
+          # describe обоих вариантов (staging=Deployment, prod=StatefulSet)
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe statefulset/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-db || true
+
+          # логи всех pod’ов DB (текущие и предыдущие, на случай рестартов)
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::DB-BOOTSTRAP: describe & logs"
+          kubectl -n "$NAMESPACE" describe job/"$RELEASE"-db-bootstrap || true
+          # pod'ы джобы помечаются label'ом job-name
+          for p in $(kubectl -n "$NAMESPACE" get pods -l job-name="$RELEASE"-db-bootstrap -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::API: describe & logs"
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-api || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-api || true
+
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+
       - name: On failure dump k8s state
         if: failure()
         run: |

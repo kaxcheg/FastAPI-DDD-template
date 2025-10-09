@@ -19,7 +19,7 @@ config:
     FASTAPI_DDD_TEMPLATE_ENV: "test"
     FASTAPI_DDD_TEMPLATE_DEBUG: "false"
     FASTAPI_DDD_TEMPLATE_LOG_DIR: "logs"
-    SERVER_HOST: "127.0.0.1"
+    SERVER_HOST: "0.0.0.0"
     SERVER_PORT: "8000"
 
     DB_ADMIN: "postgres"
