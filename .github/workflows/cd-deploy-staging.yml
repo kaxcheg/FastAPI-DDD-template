@@ -122,7 +122,6 @@ jobs:
             --set image.digest="$IMAGE_DIGEST" \
             --set app.version="$APP_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
-          $( [ -n "${{ secrets.GHCR_PAT }}" ] && echo "--set image.pullSecrets[0].name=ghcr" )
 
       - name: Wait rollout
         run: |
