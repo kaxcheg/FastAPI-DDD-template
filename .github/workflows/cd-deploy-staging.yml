@@ -123,30 +123,31 @@ jobs:
             --set app.version="$APP_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
-      - name: Wait rollout
+      - name: Wait rollout (staging: db ➜ db-bootstrap ➜ api)
+        shell: bash
         run: |
+          set -euo pipefail
 
-          # API
+          echo "⏳ Waiting for DB Deployment..."
+          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-db --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db \
+            --for=condition=Ready --timeout=120s
+
+          echo "⏳ Waiting for DB bootstrap Job to complete..."
+          kubectl -n "$NAMESPACE" wait job/"$RELEASE"-db-bootstrap \
+            --for=condition=complete --timeout=300s
+
+          echo "⏳ Waiting for API Deployment..."
           kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-api --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api \
+            --for=condition=Ready --timeout=120s
 
-          # DB: Deployment в staging, StatefulSet в prod
-          if kubectl -n "$NAMESPACE" get deploy "$RELEASE"-db >/dev/null 2>&1; then
-            kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-db --timeout=180s
-          elif kubectl -n "$NAMESPACE" get statefulset "$RELEASE"-db >/dev/null 2>&1; then
-            kubectl -n "$NAMESPACE" rollout status statefulset/"$RELEASE"-db --timeout=180s
-          fi
-
-          # Ждём завершения bootstrap-джобы (если она включена)
-          if kubectl -n "$NAMESPACE" get job "$RELEASE"-db-bootstrap >/dev/null 2>&1; then
-            kubectl -n "$NAMESPACE" wait job/"$RELEASE"-db-bootstrap \
-              --for=condition=complete --timeout=180s
-          fi
-
-          # Диагностика по релизу
-          kubectl -n "$NAMESPACE" get deploy,sts,job,svc \
+          echo "✅ Current resources for release $RELEASE:"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods \
             -l app.kubernetes.io/instance="$RELEASE" -o wide
 
-          
       - name: Smoke / Integration / E2E (stubs)
         run: |
           make test-smoke
