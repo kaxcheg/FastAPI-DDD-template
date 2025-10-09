@@ -1,0 +1,66 @@
+{{- if .Values.dbBootstrap.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fastapi-ddd-template.fullname" . }}-db-bootstrap
+  labels:
+    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.dbBootstrap.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
+        app.kubernetes.io/component: "db-bootstrap"
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-db-ready
+          image: "{{ .Values.dbBootstrap.image.repository }}:{{ .Values.dbBootstrap.image.tag }}"
+          imagePullPolicy: {{ .Values.dbBootstrap.image.pullPolicy }}
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              set -euo pipefail
+              echo "Waiting for Postgres at $DB_HOST:{{ .Values.db.port }}..."
+              for i in $(seq 1 90); do
+                if pg_isready -h "$DB_HOST" -p {{ .Values.db.port }} -U "$DB_ADMIN" >/dev/null 2>&1; then
+                  echo "Postgres is ready"; exit 0
+                fi
+                sleep 2
+              done
+              echo "Postgres not ready in time"; exit 1
+          env:
+          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- range $k := .Values.dbBootstrap.envFromConfigKeys }}
+            - name: {{ $k }}
+              valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
+          {{- end }}
+      containers:
+        - name: db-bootstrap
+          image: "{{ .Values.dbBootstrap.image.repository }}:{{ .Values.dbBootstrap.image.tag }}"
+          imagePullPolicy: {{ .Values.dbBootstrap.image.pullPolicy }}
+          command: ["/bin/bash","-lc","bash /bootstrap/bootstrap_db.sh"]
+          env:
+          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- range $k := .Values.dbBootstrap.envFromConfigKeys }}
+            - name: {{ $k }}
+              valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
+          {{- end }}
+          volumeMounts:
+            - { name: bootstrap,           mountPath: /bootstrap,     readOnly: true }
+            - { name: db-bootstrap-secrets, mountPath: /run/secrets,   readOnly: true }
+          resources:
+            {{- toYaml .Values.dbBootstrap.resources | nindent 12 }}
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: {{ include "fastapi-ddd-template.fullname" . }}-db-bootstrap-scripts
+            defaultMode: 0555
+        - name: db-bootstrap-secrets
+          secret:
+            secretName: {{ .Values.secrets.existingName }}
+            items:
+              - { key: DB_ADMIN_SECRET, path: {{ .Values.dbBootstrap.adminSecretFilePath }} }
+              - { key: DB_USER_SECRET,  path: {{ .Values.dbBootstrap.adminSecretFilePath  }} }
+{{- end }}

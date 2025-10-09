@@ -1,36 +1,37 @@
-{{- define "fastapi-ddd-template-api.name" -}}
-{{- if .Values.nameOverride }}{{ .Values.nameOverride }}{{ else }}{{ include "fastapi-ddd-template-api.fullname" . }}{{ end -}}
-{{- end }}
-
-{{- define "fastapi-ddd-template-api.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{ .Values.fullnameOverride }}
-{{- else -}}
-{{- printf "%s" .Chart.Name | trunc 63 | trimSuffix "-" -}}
+{{- define "fastapi-ddd-template.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
-{{- end }}
 
-{{/*
-Полное имя image со сборкой по digest если задан.
-*/}}
-{{- define "fastapi-ddd-template-api.image" -}}
-{{- $repo := .Values.image.repository -}}
-{{- $tag := .Values.image.tag | default "" -}}
-{{- $digest := .Values.image.digest | default "" -}}
+{{- define "fastapi-ddd-template.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "fastapi-ddd-template.labels" -}}
+app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/part-of: {{ include "fastapi-ddd-template.name" . }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end -}}
+
+# component: api|db|db-bootstrap
+{{- define "fastapi-ddd-template.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: {{ .component | quote }}
+{{- end -}}
+
+# repo@sha256:digest или repo:tag
+{{- define "fastapi-ddd-template.image" -}}
+{{- $repo := .repository -}}
+{{- $digest := .digest | default "" -}}
+{{- $tag := .tag | default "latest" -}}
 {{- if $digest -}}
-{{ printf "%s@sha256:%s" $repo $digest }}
-{{- else if $tag -}}
+{{ printf "%s@%s" $repo (printf "sha256:%s" (trimPrefix "sha256:" $digest)) }}
+{{- else -}}
 {{ printf "%s:%s" $repo $tag }}
-{{- else -}}
-{{ $repo }}
 {{- end -}}
-{{- end }}
-
-
-{{- define "fastapi-ddd-template-api.configName" -}}
-{{- if and .Values.config.enabled (not .Values.config.existingName) -}}
-{{ include "fastapi-ddd-template-api.fullname" . }}-config
-{{- else -}}
-{{- default "" .Values.config.existingName -}}
 {{- end -}}
-{{- end }}

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fastapi-ddd-template.fullname" . }}-api
+  labels:
+    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.api.service.type }}
+  selector:
+    {{- $ctx := dict "component" "api" | merge (dict) -}}
+    {{- $_ := set $ctx "Chart" .Chart -}}
+    {{- $_ := set $ctx "Release" .Release -}}
+    {{- $_ := set $ctx "Values" .Values -}}
+    {{- $_ := set $ctx "Capabilities" .Capabilities -}}
+    {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.api.service.port }}
+      targetPort: {{ .Values.api.containerPort }}

@@ -1,44 +1,36 @@
-replicaCount: 1
-
 image:
   repository: placeholder
-  # tag пустой, digest будем пробрасывать из CI/CD
   tag: ""
   digest: ""
 
-service:
-  port: 80
-  targetPort: 8000
+api:
+  replicaCount: 1
 
-# Если хотите перенести ваш configmap.yaml под управление Helm:
+db:
+  persistence:
+    enabled: false
+
+dbBootstrap:
+  enabled: true
+
 config:
   enabled: true
   data:
-    # FASTAPI_DDD_TEMPLATE application settings
     FASTAPI_DDD_TEMPLATE_ENV: "test"
     FASTAPI_DDD_TEMPLATE_DEBUG: "false"
     FASTAPI_DDD_TEMPLATE_LOG_DIR: "logs"
-
-    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: "HS256"
-    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: "30"
-
-    # FASTAPI_DDD_TEMPLATE server settings for entrypoint
     SERVER_HOST: "127.0.0.1"
     SERVER_PORT: "8000"
 
-    # DB settings
     DB_ADMIN: "postgres"
     DB_PATH: "fastapi_ddd_template_stage_db"
     DB_HOST: "db"
     DB_DRIVER: "postgresql+asyncpg"
     DB_USER: "stage_db_user"
-    DB_TABLE_SCHEMA: "fastapi_ddd_template" 
+    DB_TABLE_SCHEMA: "fastapi_ddd_template"
 
-    # FASTAPI_DDD_TEMPLATE bootstrap settings
     FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
     FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: "admin"
 
 secrets:
   existingName: "fastapi-ddd-template-secrets"
-  # revision не задаём здесь; при необходимости CD будет пробрасывать --set secrets.revision:...
-
