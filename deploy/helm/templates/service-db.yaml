@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fastapi-ddd-template.fullname" . }}-db
+  labels:
+    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- $ctx := dict "component" "db" | merge (dict) -}}
+    {{- $_ := set $ctx "Chart" .Chart -}}
+    {{- $_ := set $ctx "Release" .Release -}}
+    {{- $_ := set $ctx "Values" .Values -}}
+    {{- $_ := set $ctx "Capabilities" .Capabilities -}}
+    {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - { name: psql, port: {{ .Values.db.port }}, targetPort: {{ .Values.db.port }} }

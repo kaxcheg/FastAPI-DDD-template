@@ -1,6 +1,6 @@
 apiVersion: v2
-name: fastapi-ddd-template-api
-description: FastAPI DDD Template API
+name: fastapi-ddd-template
+description: Helm chart for FastAPI DDD Template (api, db, db-bootstrap)
 type: application
 version: 0.0.1
 appVersion: ""

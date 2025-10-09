@@ -33,12 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     env:
-      HELM_RELEASE: fastapi-ddd-template-api
+      RELEASE: fastapi-ddd-template
       NAMESPACE: staging
-      # IMAGE_REPOSITORY: placeholder
-      # если CI тегирует как staging-<sha>, можно хранить для fallback
-      # IMAGE_TAG: staging-${{ github.sha }}
-      # APP_VERSION: ${{ startsWith(github.ref_name, 'release/') && replace(github.ref_name, 'release/', '') || inputs.app_version }}
 
     steps:
       - name: Checkout
@@ -77,60 +73,13 @@ jobs:
           echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
           echo "Digest resolved: $DIGEST"
 
-      # --- Fallback (вариант B): вычислить digest по тегу через skopeo
-      # - name: Fallback resolve digest via skopeo
-      #   if: ${{ steps.read_digest.outputs.digest == '' }}
-      #   run: |
-      #     sudo apt-get update -y && sudo apt-get install -y skopeo jq
-      #     D=$(skopeo inspect docker://$IMAGE_REPOSITORY:$IMAGE_TAG | jq -r .Digest | sed 's/^sha256://')
-      #     echo "$D" > image-digest.txt
-
-      # - name: Export IMAGE_DIGEST
-      #   id: export_digest
-      #   run: |
-      #     if [ -s image-digest.txt ]; then
-      #       D=$(cat image-digest.txt | tr -d '\n' | sed 's/^sha256://')
-      #       echo "IMAGE_DIGEST=$D" >> $GITHUB_ENV
-      #       echo "Digest resolved: $D"
-      #     else
-      #       echo "No digest found" >&2
-      #       exit 1
-      #     fi
-
-      # --- imagePullSecret для GHCR (если частный образ)
-      # - name: Create/Update GHCR pull secret
-      #   if: ${{ secrets.GHCR_PAT != '' }}
-      #   run: |
-      #     kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-      #     kubectl -n "$NAMESPACE" create secret docker-registry ghcr \
-      #       --docker-server=ghcr.io \
-      #       --docker-username="${{ secrets.GHCR_USER || github.actor }}" \
-      #       --docker-password="${{ secrets.GHCR_PAT }}" \
-      #       --dry-run=client -o yaml | kubectl apply -f -
-
-      # - name: Derive APP_VERSION from release branch
-      #   if: startsWith(github.ref_name, 'release/')
-      #   run: |
-      #     APP_VERSION="${GITHUB_REF_NAME#release/}"
-      #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-
-      # - name: Derive APP_VERSION from input
-      #   if: ${{ !startsWith(github.ref_name, 'release/') }}
-      #   run: |
-      #     APP_VERSION=${{ inputs.app_version }}
-      #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-
-      # --- Helm upgrade --install с digest
-
-      # Create/Update Secret из GitHub Secrets
       - name: Create/Update fastapi-ddd-template-secrets
         env:
-          STAGING_DB_ADMIN_PASSWORD: ${{ secrets.STAGING_DB_ADMIN_PASSWORD }}
-          STAGING_DB_USER_PASSWORD: ${{ secrets.STAGING_DB_USER_PASSWORD }}
+          STAGING_DB_ADMIN_SECRET: ${{ secrets.STAGING_DB_ADMIN_SECRET }}
+          STAGING_DB_USER_SECRET: ${{ secrets.STAGING_DB_USER_SECRET }}
           STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
           STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
         run: |
@@ -142,8 +91,8 @@ jobs:
             namespace: staging
           type: Opaque
           stringData:
-            DB_ADMIN_PASSWORD: "${STAGING_DB_ADMIN_PASSWORD}"
-            DB_USER_PASSWORD: "${STAGING_DB_USER_PASSWORD}"
+            DB_ADMIN_SECRET: "${STAGING_DB_ADMIN_SECRET}"
+            DB_USER_SECRET: "${STAGING_DB_USER_SECRET}"
             FASTAPI_DDD_TEMPLATE_JWT_SECRET: "${STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET}"
             FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
           YAML
@@ -164,27 +113,22 @@ jobs:
             echo "APP_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
           fi
 
-
       - name: Helm upgrade (staging)
         run: |
-          helm upgrade --install "$HELM_RELEASE" deploy/helm/fastapi-ddd-template-api \
+          helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" --create-namespace \
-            -f deploy/helm/fastapi-ddd-template-api/values-staging.yaml \
+            -f deploy/helm/values-staging.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
-            --set app.version="$APP_VERSION" \
+            --set app.version="$APP_VERSION" \ 
+            --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
           $( [ -n "${{ secrets.GHCR_PAT }}" ] && echo "--set image.pullSecrets[0].name=ghcr" )
 
       - name: Wait rollout
         run: |
-          kubectl -n "$NAMESPACE" rollout status deploy/$HELM_RELEASE --timeout=120s
+          kubectl -n "$NAMESPACE" rollout status deploy/$RELEASE --timeout=120s
           kubectl -n "$NAMESPACE" get pods,svc -o wide
           
-      # - name: Health check API
-      #   run: |
-      #     kubectl -n staging rollout status deploy/fastapi-ddd-template-api --timeout=300s
-      #     kubectl -n staging get svc
-
       - name: Smoke / Integration / E2E (stubs)
         run: |
           make test-smoke
@@ -197,4 +141,4 @@ jobs:
           kubectl -n staging get all
           kubectl -n staging describe pods
           kubectl -n staging logs -l app=db --tail=200 || true
-          kubectl -n staging logs -l app=fastapi-ddd-template-api --tail=200 || true
+          kubectl -n staging logs -l app=api --tail=200 || true

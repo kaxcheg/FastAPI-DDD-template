@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fastapi-ddd-template.fullname" . }}-api
+  labels:
+    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      {{- $ctx := dict "component" "api" | merge (dict) -}}
+      {{- $_ := set $ctx "Chart" .Chart -}}
+      {{- $_ := set $ctx "Release" .Release -}}
+      {{- $_ := set $ctx "Values" .Values -}}
+      {{- $_ := set $ctx "Capabilities" .Capabilities -}}
+      {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
+        app.kubernetes.io/component: "api"
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "fastapi-ddd-template.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ name: http, containerPort: {{ .Values.api.containerPort }} }]
+          command: [ "python", "./entrypoint.py", "uvicorn", "app.interface.http.main:app",
+                     "--host", "$(SERVER_HOST)", "--port", "$(SERVER_PORT)" ]
+          # ТОЛЬКО выбранные ключи из ConfigMap
+          env:
+          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- range $k := .Values.api.envFromConfigKeys }}
+            - name: {{ $k }}
+              valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
+          {{- end }}
+          # Секреты: МОНТИРУЕМ ФАЙЛАМИ
+          volumeMounts:
+            - name: applogs
+              mountPath: {{ .Values.api.logDirPath }}
+            - name: api-secrets
+              mountPath: /run/secrets
+              readOnly: true
+          {{- if .Values.api.probes.enabled }}
+          readinessProbe:
+            httpGet: { path: {{ .Values.api.probes.path }}, port: http }
+            initialDelaySeconds: {{ .Values.api.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet: { path: {{ .Values.api.probes.path }}, port: http }
+            initialDelaySeconds: {{ .Values.api.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.probes.liveness.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: applogs
+          emptyDir: {}
+        - name: api-secrets
+          secret:
+            secretName: {{ .Values.secrets.existingName }}
+            items:
+              - key: FASTAPI_DDD_TEMPLATE_JWT_SECRET
+                path: {{ .Values.api.secretFilesPath.FASTAPI_DDD_TEMPLATE_JWT_SECRET_PATH }}
+              - key: FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH
+                path: {{ .Values.api.secretFilesPath.BOOTSTRAP_ADMIN_PASSWORD_HASH_PATH }}
+              - key: DB_USER_SECRET
+                path: {{ .Values.api.secretFilesPath.DB_USER_SECRET_PATH }}

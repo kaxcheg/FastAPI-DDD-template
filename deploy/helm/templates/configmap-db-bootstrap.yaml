@@ -1,0 +1,11 @@
+{{- if and .Values.dbBootstrap.enabled .Values.dbBootstrap.script }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fastapi-ddd-template.fullname" . }}-db-bootstrap-scripts
+  labels:
+    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+data:
+  bootstrap_db.sh: |
+{{- .Values.dbBootstrap.script | nindent 4 }}
+{{- end }}
