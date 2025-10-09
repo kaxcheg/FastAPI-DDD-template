@@ -62,5 +62,5 @@ spec:
             secretName: {{ .Values.secrets.existingName }}
             items:
               - { key: DB_ADMIN_SECRET, path: {{ .Values.dbBootstrap.adminSecretFilePath }} }
-              - { key: DB_USER_SECRET,  path: {{ .Values.dbBootstrap.adminSecretFilePath  }} }
+              - { key: DB_USER_SECRET,  path: {{ .Values.dbBootstrap.userSecretFilePath  }} }
 {{- end }}
