@@ -120,7 +120,7 @@ jobs:
             -f deploy/helm/values-staging.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
-            --set app.version="$APP_VERSION" \ 
+            --set app.version="$APP_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
           $( [ -n "${{ secrets.GHCR_PAT }}" ] && echo "--set image.pullSecrets[0].name=ghcr" )
 
