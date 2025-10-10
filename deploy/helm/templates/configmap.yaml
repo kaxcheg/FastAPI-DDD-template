@@ -6,7 +6,18 @@ metadata:
   labels:
     {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
 data:
-{{- range $k, $v := .Values.config.data }}
-  {{ $k }}: {{ $v | quote }}
-{{- end }}
-{{- end }}
+  {{- $short := printf "%s-db" (include "fastapi-ddd-template.fullname" .) -}}
+  {{- $fqdnhost := printf "%s-db.%s.svc.%s" (include "fastapi-ddd-template.fullname" .) .Release.Namespace (default "cluster.local" .Values.clusterDomain) -}}
+
+  {{- if hasKey .Values.config.data "DB_HOST" }}
+  DB_HOST: {{ index .Values.config.data "DB_HOST" | quote }}
+  {{- else if .Values.useFQDN }}
+  DB_HOST: {{ $fqdnhost | quote }}
+  {{- else }}
+  DB_HOST: {{ $short | quote }}
+  {{- end }}
+  
+  {{- range $k, $v := .Values.config.data }}
+    {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  {{- end }}
