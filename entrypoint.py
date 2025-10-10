@@ -59,7 +59,7 @@ def main() -> int:
     # else:
     #     port = os.getenv(db_port_key, 5432)
 
-    wait_for_db(host, 432, 60)
+    wait_for_db(host, 5432, 60)
     run_cmd(["alembic", "upgrade", "head"])
 
     bootstrap_flag = os.getenv("FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG")
