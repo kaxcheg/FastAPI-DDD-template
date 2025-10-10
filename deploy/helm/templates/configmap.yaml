@@ -16,8 +16,9 @@ data:
   {{- else }}
   DB_HOST: {{ $short | quote }}
   {{- end }}
-  
+
   {{- range $k, $v := .Values.config.data }}
-    {{ $k }}: {{ $v | quote }}
+  {{- if ne $k "DB_HOST" }}
+  {{ $k }}: {{ $v | quote }}
   {{- end }}
   {{- end }}
