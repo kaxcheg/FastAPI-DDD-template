@@ -96,7 +96,6 @@ config:
     DB_ADMIN: "postgres"
     DB_USER: "app_user"
     DB_PATH: "fastapi_ddd_template_db"
-    DB_HOST: "db"
     DB_DRIVER: "postgresql+asyncpg"
     DB_TABLE_SCHEMA: "fastapi_ddd_template"
     FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
