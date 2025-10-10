@@ -44,7 +44,7 @@ def main() -> int:
             sys.exit("[entrypoint] no CMD provided")
     
     db_host_key = next((key for key in os.environ if key.endswith("DB_HOST")), None)
-    db_port_key = next((key for key in os.environ if key.endswith("DB_PORT")), None)
+    # db_port_key = next((key for key in os.environ if key.endswith("DB_PORT")), None)
 
     if not db_host_key:
         raise RuntimeError("[entrypoint] DB_HOST var not found")
@@ -54,12 +54,12 @@ def main() -> int:
         raise RuntimeError(f"[entrypoint] {db_host_key} is not set")
 
 
-    if not db_port_key:
-        port = 5432
-    else:
-        port = os.getenv(db_port_key, 5432)
+    # if not db_port_key:
+    #     port = 5432
+    # else:
+    #     port = os.getenv(db_port_key, 5432)
 
-    wait_for_db(host, int(port), 60)
+    wait_for_db(host, 432, 60)
     run_cmd(["alembic", "upgrade", "head"])
 
     bootstrap_flag = os.getenv("FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG")
