@@ -116,6 +116,7 @@ jobs:
       - name: Helm upgrade (staging)
         run: |
           helm upgrade --install "$RELEASE" deploy/helm \
+            --namespace "$NAMESPACE" \
             -f deploy/helm/values-staging.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
