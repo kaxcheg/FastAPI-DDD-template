@@ -36,6 +36,3 @@ jobs:
         run: make lint
       - name: Run Unit Tests
         run: poetry run make test-unit
-
-
-

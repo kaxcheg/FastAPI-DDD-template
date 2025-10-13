@@ -33,15 +33,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports: [{ name: http, containerPort: {{ .Values.api.containerPort }} }]
           command: [ "python", "./entrypoint.py", "uvicorn", "app.interface.http.main:app",
-                     "--host", "$(SERVER_HOST)", "--port", "$(SERVER_PORT)" ]
-          # ТОЛЬКО выбранные ключи из ConfigMap
+                     "--host", "0.0.0.0.", "--port", {{ .Values.api.containerPort }} ]
+
           env:
           {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.api.envFromConfigKeys }}
             - name: {{ $k }}
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
           {{- end }}
-          # Секреты: МОНТИРУЕМ ФАЙЛАМИ
+
           volumeMounts:
             - name: applogs
               mountPath: {{ .Values.api.logDirPath }}

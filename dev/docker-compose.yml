@@ -67,7 +67,7 @@ services:
       FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: ${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG}
       FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: ${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN}
     ports:
-    - ${SERVER_HOST}:${SERVER_PORT}:${SERVER_PORT}
+    - 127.0.0.1:8000:8000
     restart: unless-stopped
     entrypoint:
     - python
@@ -77,7 +77,7 @@ services:
     - --host
     - 0.0.0.0
     - --port
-    - ${SERVER_PORT}
+    - "8000"
     secrets:
     - source: fastapi_ddd_template_jwt_secret
       target: fastapi_ddd_template_jwt_secret
@@ -86,7 +86,7 @@ services:
     - source: fastapi_ddd_template_bootstrap_admin_password_hash
       target: fastapi_ddd_template_bootstrap_admin_password_hash
     volumes:
-    - ./logs:/fastapi_ddd_template/${FASTAPI_DDD_TEMPLATE_LOG_DIR}
+    - ./logs:/var/logs/${FASTAPI_DDD_TEMPLATE_LOG_DIR}
 volumes:
   pgdata: {}
 secrets:
