@@ -155,7 +155,7 @@ jobs:
           make test-int-staging
       
       - name: Helm smoke test
-        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s
+        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
 
       - name: E2E tests
         run: |
