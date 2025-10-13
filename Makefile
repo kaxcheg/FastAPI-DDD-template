@@ -204,12 +204,8 @@ test-int-ci:
 test-int-staging:
 	@echo "Staging integration tests placeholder - implement actual integration suite."
 
-# Smoke tests placeholder (stub)
-test-smoke:
-	@echo "Smoke tests placeholder - implement actual smoke suite."
-
 # e2e tests placeholder (stub)
-test-e2e:
+test-e2e-staging:
 	@echo "e2e tests placeholder - implement actual e2e suite."
 
 lint:

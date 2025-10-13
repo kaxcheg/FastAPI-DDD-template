@@ -15,12 +15,11 @@ concurrency:
 
 jobs:
   call-fast-checks:
-      uses: ./.github/workflows/_fast-checks.yml
-      with:
-        python-version: "3.12"
+    uses: ./.github/workflows/_fast-checks.yml
+    with:
+      python-version: "3.12"
   
   build-and-integration-tests:
-    name: Build image and run integration checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
