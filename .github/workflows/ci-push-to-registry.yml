@@ -21,7 +21,6 @@ env:
 
 jobs:
   build:
-    name: Build & Push (build-once)
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}

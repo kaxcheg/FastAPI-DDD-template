@@ -2,11 +2,29 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/owner/repo
+  repository: placeholder
   tag: ""
   digest: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
+
+config:
+  enabled: true
+  data:
+    FASTAPI_DDD_TEMPLATE_ENV: ""
+    FASTAPI_DDD_TEMPLATE_DEBUG: ""
+    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: "HS256"
+    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: "30"
+    DB_ADMIN: ""
+    DB_USER: ""
+    DB_PATH: ""
+    DB_DRIVER: "postgresql+asyncpg"
+    DB_TABLE_SCHEMA: "fastapi_ddd_template"
+    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
+    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: "admin"
+
+secrets:
+  existingName: "fastapi-ddd-template-secrets"
 
 api:
   replicaCount: 1
@@ -22,16 +40,14 @@ api:
   resources:
     requests: { cpu: "50m",  memory: "64Mi" }
     limits:   { cpu: "250m", memory: "256Mi" }
-  logDirPath: /fastapi_ddd_template/logs
-  # ВАЖНО: только эти ключи из ConfigMap попадут в env контейнера API
+  logDirPath: /var/log/api_logs
+
   envFromConfigKeys:
     - FASTAPI_DDD_TEMPLATE_ENV
     - FASTAPI_DDD_TEMPLATE_DEBUG
     - FASTAPI_DDD_TEMPLATE_LOG_DIR
     - FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM
     - FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME
-    - SERVER_HOST
-    - SERVER_PORT
     - DB_DRIVER
     - DB_HOST
     - DB_PATH
@@ -39,7 +55,7 @@ api:
     - DB_TABLE_SCHEMA
     - FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG
     - FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN
-  # Имена файлов для секретов, которые смонтируем как том
+
   secretFilesPath:
     FASTAPI_DDD_TEMPLATE_JWT_SECRET_PATH: fastapi_ddd_template_jwt_secret
     BOOTSTRAP_ADMIN_PASSWORD_HASH_PATH: fastapi_ddd_template_bootstrap_admin_password_hash
@@ -55,12 +71,11 @@ db:
   resources:
     requests: { cpu: "100m", memory: "256Mi" }
     limits:   { cpu: "1",    memory: "1Gi" }
-  # Только эти ключи кинем в env контейнера DB
+
   envFromConfigKeys:
     - DB_ADMIN
     - DB_PATH
 
-  # имя файла с админским паролем Postgres (секрет монтируем томом)
   adminSecretPath: db_admin_secret
 
 dbBootstrap:
@@ -70,36 +85,15 @@ dbBootstrap:
   resources:
     requests: { cpu: "50m",  memory: "64Mi" }
     limits:   { cpu: "250m", memory: "256Mi" }
-  # Только эти ключи пойдут в env job'а
+
   envFromConfigKeys:
     - DB_ADMIN
     - DB_USER
     - DB_PATH
     - DB_HOST
     - DB_TABLE_SCHEMA
-  # Имена файлов с секретами (том /run/secrets)
+
   adminSecretFilePath: db_admin_secret
   userSecretFilePath:  db_user_secret
-  # Содержимое скрипта пробрасываем из CD: --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
+
   script: ""
-
-config:
-  enabled: true
-  data:
-    FASTAPI_DDD_TEMPLATE_ENV: "test"
-    FASTAPI_DDD_TEMPLATE_DEBUG: "false"
-    FASTAPI_DDD_TEMPLATE_LOG_DIR: "logs"
-    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: "HS256"
-    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: "30"
-    SERVER_HOST: "0.0.0.0"
-    SERVER_PORT: "8000"
-    DB_ADMIN: "postgres"
-    DB_USER: "app_user"
-    DB_PATH: "fastapi_ddd_template_db"
-    DB_DRIVER: "postgresql+asyncpg"
-    DB_TABLE_SCHEMA: "fastapi_ddd_template"
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: "admin"
-
-secrets:
-  existingName: "fastapi-ddd-template-secrets"

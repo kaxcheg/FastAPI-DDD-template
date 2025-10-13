@@ -26,9 +26,3 @@ COPY ./alembic.ini ./alembic.ini
 # rm -rf /var/lib/apt/lists/* cleans apt cache to reduce image size
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl && rm -rf /var/lib/apt/lists/*
-
-# CMD sh -c shell form; uns sh interpretator(bash is not present in slim), -c specifies string to execute
-# -f makes curl return nonzero on HTTP errors so || will run exit 1
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD bash -lc 'hv=$SERVER_HOST; pv=$SERVER_PORT; \
-                curl -f "http://${!hv:-localhost}:${!pv:-8000}/health" || exit 1'

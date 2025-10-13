@@ -116,7 +116,6 @@ jobs:
       - name: Helm upgrade (staging)
         run: |
           helm upgrade --install "$RELEASE" deploy/helm \
-            --namespace "$NAMESPACE" --create-namespace \
             -f deploy/helm/values-staging.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
@@ -150,11 +149,16 @@ jobs:
             -l app.kubernetes.io/instance="$RELEASE" -o wide
 
         
-      - name: Smoke / Integration / E2E (stubs)
+      - name: Integration tests
         run: |
-          make test-smoke
           make test-int-staging
-          make test-e2e
+      
+      - name: Helm smoke test
+        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s
+
+      - name: E2E tests
+        run: |
+          make test-e2e-staging
 
       - name: Get logs on failure (db ▸ db-bootstrap ▸ api)
         if: ${{ failure() }}
@@ -168,12 +172,10 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::DB: describe & logs"
-          # describe обоих вариантов (staging=Deployment, prod=StatefulSet)
           kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-db || true
           kubectl -n "$NAMESPACE" describe statefulset/"$RELEASE"-db || true
           kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-db || true
 
-          # логи всех pod’ов DB (текущие и предыдущие, на случай рестартов)
           for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db -o name); do
             echo "--- logs $p (current) ---"
             kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 || true
@@ -186,7 +188,6 @@ jobs:
 
           echo "::group::DB-BOOTSTRAP: describe & logs"
           kubectl -n "$NAMESPACE" describe job/"$RELEASE"-db-bootstrap || true
-          # pod'ы джобы помечаются label'ом job-name
           for p in $(kubectl -n "$NAMESPACE" get pods -l job-name="$RELEASE"-db-bootstrap -o name); do
             echo "--- logs $p (current) ---"
             kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
@@ -209,4 +210,29 @@ jobs:
             echo "--- describe $p events ---"
             kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
           done
+          echo "::endgroup::"
+
+          echo "::group::SMOKE: describe & logs (helm.sh/hook-name=smoke)"
+
+          for p in $(kubectl -n "$NAMESPACE" get pods \
+              -l app.kubernetes.io/instance="$RELEASE" \
+              -o name); do
+
+            hook_name="$(kubectl -n "$NAMESPACE" get "$p" -o jsonpath='{.metadata.annotations.helm\.sh/hook-name}' 2>/dev/null || true)"
+            if [ "$hook_name" = "smoke" ]; then
+              echo "--- describe $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" || true
+
+              echo "--- logs $p (current) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+
+              echo "--- logs $p (previous) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+
+              echo "--- events for $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+            fi
+          done
+
+          kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE" -o wide | grep -E 'smoke' || true
           echo "::endgroup::"

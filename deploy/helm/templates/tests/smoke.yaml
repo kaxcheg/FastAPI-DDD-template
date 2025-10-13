@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "fastapi-ddd-template.fullname" . }}-smoke"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-name": smoke
+spec:
+  restartPolicy: Never
+  containers:
+    - name: smoke
+      image: curlimages/curl:8.10.1
+      command:
+        - sh
+        - -c
+        - >
+          URL="http://{{ include "fastapi-ddd-template.api-name" . }}:{{ .Values.api.service.port }}/health";
+          echo "GET $URL";
+          for i in $(seq 1 30); do
+            curl -fsSL "$URL" && echo "SMOKE OK" && exit 0;
+            echo "Waiting... ($i)"; sleep 2;
+          done;
+          echo "SMOKE FAIL"; exit 1
+          

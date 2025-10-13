@@ -10,6 +10,18 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "fastapi-ddd-template.db-name" -}}
+{{ include "fastapi-ddd-template.name" . }}-db
+{{- end -}}
+
+{{- define "fastapi-ddd-template.api-name" -}}
+{{ include "fastapi-ddd-template.name" . }}-api
+{{- end -}}
+
+{{- define "fastapi-ddd-template.api-log-dir-path" -}}
+{{ .Values.api.logDirPath }}
+{{- end -}}
+
 {{- define "fastapi-ddd-template.labels" -}}
 app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
