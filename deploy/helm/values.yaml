@@ -27,6 +27,7 @@ secrets:
   existingName: "fastapi-ddd-template-secrets"
 
 api:
+  version: ""
   replicaCount: 1
   containerPort: 8000
   service:

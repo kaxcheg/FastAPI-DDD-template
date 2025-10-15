@@ -100,7 +100,7 @@ jobs:
       - name: Set IMAGE_REPOSITORY (lowercased)
         run: echo "IMAGE_REPOSITORY=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - name: Derive APP_VERSION
+      - name: Derive API_VERSION
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             BRANCH="${{ github.event.workflow_run.head_branch }}"
@@ -108,9 +108,9 @@ jobs:
             BRANCH="${{ github.ref_name }}"
           fi
           if [[ "$BRANCH" == release/* ]]; then
-            echo "APP_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
+            echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
           else
-            echo "APP_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
+            echo "API_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
           fi
 
       - name: Helm upgrade (staging)
@@ -120,7 +120,7 @@ jobs:
             -f deploy/helm/values-staging.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
-            --set app.version="$APP_VERSION" \
+            --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
       - name: Wait rollout
