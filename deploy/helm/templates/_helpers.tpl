@@ -26,7 +26,7 @@
 app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/part-of: {{ include "fastapi-ddd-template.name" . }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/version: {{ default .Chart.AppVersion .Values.api.version | quote }}
 {{- end -}}
 
 # component: api|db|db-bootstrap
