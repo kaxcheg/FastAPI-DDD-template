@@ -1,4 +1,4 @@
-name: CD deploy to staging
+name: CD deploy to CI runner
 
 on:
   workflow_run:
@@ -26,15 +26,15 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  deploy-staging:
+  deploy-ci-runner:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ci-runner
     env:
       RELEASE: fastapi-ddd-template
-      NAMESPACE: staging
+      NAMESPACE: ci-runner
 
     steps:
       - name: Checkout
@@ -83,12 +83,12 @@ jobs:
           FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
           FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
         run: |
-          kubectl -n staging apply -f - <<YAML
+          kubectl -n "$NAMESPACE" apply -f - <<YAML
           apiVersion: v1
           kind: Secret
           metadata:
             name: fastapi-ddd-template-secrets
-            namespace: staging
+            namespace: "$NAMESPACE"
           type: Opaque
           stringData:
             DB_ADMIN_SECRET: "${DB_ADMIN_SECRET}"
@@ -113,11 +113,11 @@ jobs:
             echo "API_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
           fi
 
-      - name: Helm upgrade (staging)
+      - name: Helm upgrade
         run: |
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
-            -f deploy/helm/values-staging.yaml \
+            -f deploy/helm/values-ci-runner.yaml \
             --set image.repository="$IMAGE_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
             --set-string api.version="$API_VERSION" \
@@ -152,14 +152,14 @@ jobs:
         
       - name: Integration tests
         run: |
-          make test-int-staging
+          make test-int
       
       - name: Helm smoke test
         run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
 
       - name: E2E tests
         run: |
-          make test-e2e-staging
+          make test-e2e
 
       - name: Get logs on failure (db ▸ db-bootstrap ▸ api)
         if: ${{ failure() }}

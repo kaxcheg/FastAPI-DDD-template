@@ -17,7 +17,7 @@ spec:
           URL="http://{{ include "fastapi-ddd-template.api-name" . }}:{{ .Values.api.service.port }}/health";
           echo "GET $URL";
           for i in $(seq 1 30); do
-            curl -fsSL "$URL" && echo "\nSMOKE OK" && exit 0;
+            curl -fsSL "$URL" && echo -e "\nSMOKE OK" && exit 0;
             echo "Waiting... ($i)"; sleep 2;
           done;
           echo "SMOKE FAIL"; exit 1

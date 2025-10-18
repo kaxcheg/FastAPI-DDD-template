@@ -2,7 +2,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: placeholder
+  repository: ""
   tag: ""
   digest: ""
   pullPolicy: IfNotPresent
@@ -15,7 +15,7 @@ config:
     FASTAPI_DDD_TEMPLATE_DEBUG: ""
     FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: "HS256"
     FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: "30"
-    DB_ADMIN: ""
+    DB_ADMIN: "postgres"
     DB_USER: ""
     DB_PATH: ""
     DB_DRIVER: "postgresql+asyncpg"
