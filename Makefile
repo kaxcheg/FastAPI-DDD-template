@@ -1,8 +1,6 @@
 # Makefile for fastapi_ddd_template (full, Dockerfile in repo root)
 # Usage examples:
-#   make build                      # локальная сборка (--load)
-#   make LOAD_LOCAL=false build     # CI: сборка с пушем
-#   make push-ghcr                  # buildx push + сохранение digest
+#   make build
 #   make up ENV_FILE=.env.dev       # docker compose with env file
 #
 # Override variables via env or cli:
@@ -19,22 +17,13 @@ SHELL := /bin/bash
 APP_DIR ?= app
 
 # Image / build settings
-IMAGE ?= fastapi_ddd_template_app
+IMAGE ?= fastapi_ddd_template_api
 TAG ?= dev
 FULL_IMAGE ?= $(IMAGE):$(TAG)
-
-# GHCR (override GITHUB_USER or set env)
-GITHUB_USER ?=
-GHCR_REPO ?= ghcr.io/$(GITHUB_USER)/$(IMAGE)
-GHCR_TAG ?= staging-$(shell git rev-parse --short HEAD 2>/dev/null || echo local)
-GHCR_IMAGE ?= $(GHCR_REPO):$(GHCR_TAG)
 
 # buildx settings
 BUILDX ?= docker buildx build
 BUILD_PLATFORMS ?= linux/amd64
-# LOAD_LOCAL=true  -> use --load (local dev)
-# LOAD_LOCAL=false -> use --push (CI)
-LOAD_LOCAL ?= true
 
 # docker-compose / env
 COMPOSE_FILE ?= ./dev/docker-compose.yml
@@ -50,16 +39,15 @@ JQ ?= jq
 # -----------------------
 # Phony targets
 # -----------------------
-.PHONY: help build push-ghcr compose-build up down restart logs ps db-up db-down \
-        bootstrap run test itest lint pull-ghcr clean images rm-image
+.PHONY: help build compose-build up down restart logs ps db-up db-down \
+        bootstrap run test itest lint clean images rm-image
 
 # -----------------------
 # Help
 # -----------------------
 help:
 	@printf "\nMakefile targets:\n\n"
-	@printf "  build            Build the application image (buildx). Use LOAD_LOCAL=true to --load.\n"
-	@printf "  push-ghcr        Build & push app image to GHCR and save digest to image_digest.txt\n"
+	@printf "  build            Build the application image (buildx).
 	@printf "  compose-build    Build services via docker compose (if compose build contexts exist)\n"
 	@printf "  up               docker compose up (uses --env-file $(ENV_FILE))\n"
 	@printf "  down             docker compose down\n"
@@ -73,7 +61,6 @@ help:
 	@printf "  test             run unit tests (pytest in $(TEST_DIR))\n"
 	@printf "  itest            integration tests placeholder (stub)\n"
 	@printf "  lint             run linters if installed (black/ruff/isort/mypy)\n"
-	@printf "  pull-ghcr        pull image from GHCR for debug\n"
 	@printf "  clean            remove compose containers and local image $(FULL_IMAGE)\n"
 	@printf "  images           list local images for $(IMAGE)\n"
 	@printf "  rm-image         remove specific image by TAG (usage: make rm-image TAG=...)\n\n"
@@ -83,16 +70,9 @@ help:
 # -----------------------
 
 # Build app image using buildx. Context is repo root (Dockerfile in repo root).
-# Local: make LOAD_LOCAL=true build  -> --load into local docker
-# CI:    make LOAD_LOCAL=false build -> --push to registry (if configured)
 build:
-ifeq ($(LOAD_LOCAL),true)
 	@echo "Building (local load) $(FULL_IMAGE) from . (Dockerfile in repo root)..."
 	$(BUILDX) --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --load .
-else
-	@echo "Building and pushing $(FULL_IMAGE) from . (Dockerfile in repo root)..."
-	$(BUILDX) --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --push .
-endif
 
 # Build all images defined in compose (if compose has build contexts)
 compose-build:
@@ -102,25 +82,6 @@ compose-build:
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
-
-# Build & push to GHCR, then save digest to image_digest.txt
-# Requires: docker login to GHCR or GHCR_PAT available to docker login
-push-ghcr:
-	@echo "Building & pushing to GHCR: $(GHCR_IMAGE)"
-	$(BUILDX) --platform=$(BUILD_PLATFORMS) -t $(GHCR_IMAGE) --push .
-	@echo "Inspecting image digest for $(GHCR_IMAGE)..."
-	@{ \
-		D=$$(docker buildx imagetools inspect $(GHCR_IMAGE) --raw 2>/dev/null | $(JQ) -r '.manifests[0].digest' 2>/dev/null || true); \
-		if [ -z "$$D" ]; then \
-		  D=$$(docker manifest inspect $(GHCR_IMAGE) 2>/dev/null | $(JQ) -r '.[0].digest' 2>/dev/null || true); \
-		fi; \
-		if [ -z "$$D" ]; then \
-		   echo "Warning: could not obtain digest via imagetools or manifest; trying docker inspect..."; \
-		   D=$$(docker inspect --format='{{index .RepoDigests 0}}' $(GHCR_IMAGE) 2>/dev/null || true); \
-		fi; \
-		if [ -z "$$D" ]; then echo "ERROR: failed to obtain digest for $(GHCR_IMAGE)"; exit 1; fi; \
-		echo "APP_DIGEST=$$D" | tee image_digest.txt; \
-	}
 
 # -----------------------
 # Compose / runtime targets
@@ -196,16 +157,12 @@ test-unit:
 	@echo "Running unit tests via pytest in $(TEST_DIR)..."
 	$(PYTEST) $(TEST_DIR) --envfile=$(ENV_FILE) -q
 
-# CI integration tests placeholder (stub)
-test-int-ci:
-	@echo "Fast CI integration tests placeholder - implement actual integration suite."
-
-# Staging integration tests placeholder (stub)
-test-int-staging:
-	@echo "Staging integration tests placeholder - implement actual integration suite."
+# Integration tests placeholder (stub)
+test-int:
+	@echo "Integration tests placeholder - implement actual integration suite."
 
 # e2e tests placeholder (stub)
-test-e2e-staging:
+test-e2e:
 	@echo "e2e tests placeholder - implement actual e2e suite."
 
 lint:
@@ -246,14 +203,6 @@ lint:
 	else \
 		echo "mypy not installed, skipping"; \
 	fi
-
-# -----------------------
-# Registry helpers
-# -----------------------
-
-pull-ghcr:
-	@echo "Pulling $(GHCR_IMAGE)..."
-	docker pull $(GHCR_IMAGE) || echo "Pull failed (image may not exist)"
 
 # -----------------------
 # Cleanup

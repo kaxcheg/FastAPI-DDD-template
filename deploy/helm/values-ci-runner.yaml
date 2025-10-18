@@ -1,5 +1,5 @@
 image:
-  repository: placeholder
+  repository: ""
   tag: ""
   digest: ""
 
@@ -9,12 +9,8 @@ config:
     FASTAPI_DDD_TEMPLATE_ENV: "test"
     FASTAPI_DDD_TEMPLATE_DEBUG: "false"
 
-    DB_ADMIN: "postgres"
-    DB_USER: "stage_db_user"
-    DB_PATH: "fastapi_ddd_template_stage_db"
-
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: "admin"
+    DB_USER: "ci_db_user"
+    DB_PATH: "fastapi_ddd_template_ci_db"
 
 api:
   replicaCount: 1
