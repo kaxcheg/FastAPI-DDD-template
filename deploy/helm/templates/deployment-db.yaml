@@ -27,7 +27,7 @@ spec:
           image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
           imagePullPolicy: {{ .Values.db.image.pullPolicy }}
           ports: [{ name: psql, containerPort: {{ .Values.db.port }} }]
-          # ТОЛЬКО нужные ключи
+
           env:
           {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.db.envFromConfigKeys }}
