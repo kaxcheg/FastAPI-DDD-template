@@ -57,7 +57,7 @@ spec:
           secret:
             secretName: {{ .Values.secrets.existingName }}
             items:
-              - { key: DB_ADMIN_SECRET, path: {{ .Values.db.adminSecretFile }} }
+              - { key: DB_ADMIN_SECRET, path: {{ .Values.db.adminSecretPath }} }
   volumeClaimTemplates:
     - metadata: { name: pgdata }
       spec:

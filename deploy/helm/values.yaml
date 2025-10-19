@@ -41,7 +41,6 @@ api:
   resources:
     requests: { cpu: "50m",  memory: "64Mi" }
     limits:   { cpu: "250m", memory: "256Mi" }
-  logDirPath: /var/log/api_logs
 
   envFromConfigKeys:
     - FASTAPI_DDD_TEMPLATE_ENV
