@@ -1,9 +1,9 @@
-name: CI build & push to registry
+name: CI build & push to ghcr
 
 on:
-  push:
-    branches:
-      - 'release/**'
+  # push:
+  #   branches:
+  #     - 'release/**'
   workflow_dispatch: {}
 
 concurrency:
