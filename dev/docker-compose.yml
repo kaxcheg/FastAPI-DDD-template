@@ -46,8 +46,8 @@ services:
       target: db_user_secret
     volumes:
     - ../deploy/bootstrap:/bootstrap:ro
-  app:
-    image: fastapi_ddd_template_app:dev
+  api:
+    image: fastapi_ddd_template_api:dev
     depends_on:
       db:
         condition: service_healthy
@@ -56,7 +56,6 @@ services:
     environment:
       FASTAPI_DDD_TEMPLATE_ENV: ${FASTAPI_DDD_TEMPLATE_ENV}
       FASTAPI_DDD_TEMPLATE_DEBUG: ${FASTAPI_DDD_TEMPLATE_DEBUG}
-      FASTAPI_DDD_TEMPLATE_LOG_DIR: ${FASTAPI_DDD_TEMPLATE_LOG_DIR}
       FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: ${FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM}
       FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: ${FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME}
       DB_DRIVER: ${DB_DRIVER}
@@ -85,8 +84,6 @@ services:
       target: db_user_secret
     - source: fastapi_ddd_template_bootstrap_admin_password_hash
       target: fastapi_ddd_template_bootstrap_admin_password_hash
-    volumes:
-    - ./logs:/var/logs/${FASTAPI_DDD_TEMPLATE_LOG_DIR}
 volumes:
   pgdata: {}
 secrets:

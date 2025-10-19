@@ -18,7 +18,6 @@ class BaseConfig(BaseSettings):
 
     FASTAPI_DDD_TEMPLATE_ENV: Literal["dev", "test", "prod"]
     FASTAPI_DDD_TEMPLATE_DEBUG: bool
-    FASTAPI_DDD_TEMPLATE_LOG_DIR: str
 
     FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: str
     FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: int

@@ -6,7 +6,7 @@ from typing import Awaitable, Callable, Final
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.config.logging import configure_logging, get_logger
+from app.config.logging import get_logger
 from app.interface.http.routes import login, users
 
 logger = get_logger(__name__)  # Reuse module-level logger.
@@ -14,7 +14,6 @@ logger = get_logger(__name__)  # Reuse module-level logger.
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application instance."""
-    configure_logging()
 
     app = FastAPI(title="FastAPI DDD template")
     app.include_router(users.router, tags=["User"])
