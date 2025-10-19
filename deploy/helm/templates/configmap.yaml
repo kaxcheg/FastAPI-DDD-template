@@ -5,7 +5,6 @@ metadata:
   name: {{ include "fastapi-ddd-template.fullname" . }}-config
 data:
   DB_HOST: {{ include "fastapi-ddd-template.db-name" . }}
-  FASTAPI_DDD_TEMPLATE_LOG_DIR: {{ include "fastapi-ddd-template.api-log-dir-path" . }}
   {{- range $k, $v := .Values.config.data }}
   {{- if ne $k "DB_HOST" }}
   {{ $k }}: {{ $v | quote }}
