@@ -5,24 +5,11 @@ import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
+from logging import StreamHandler
 from pathlib import Path
 from typing import Any, Final
 
 from app.config import get_settings
-
-_logger_configured = False
-
-
-def configure_logging() -> None:
-    """Idempotent logging setup (call early in bootstrap)."""
-    global _logger_configured
-    if _logger_configured:
-        return
-    cfg = get_settings()
-    log_dir = Path(cfg.FASTAPI_DDD_TEMPLATE_LOG_DIR)
-    log_dir.mkdir(parents=True, exist_ok=True)
-    _logger_configured = True
-
 
 class JsonFormatter(logging.Formatter):
     """Format log record as JSON string and mask sensitive fields."""
@@ -89,18 +76,6 @@ def get_logger(name: str) -> logging.Logger:
     logger.propagate = False
     cfg = get_settings()
     logger.setLevel(logging.DEBUG if cfg.FASTAPI_DDD_TEMPLATE_DEBUG else logging.INFO)
-
-    # File handler — one per logger.
-    log_path = os.path.join(cfg.FASTAPI_DDD_TEMPLATE_LOG_DIR, f"{name}.log")
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    if not any(
-        isinstance(h, RotatingFileHandler) and h.baseFilename == log_path
-        for h in logger.handlers
-    ):
-        handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3)
-        handler.setLevel(logger.level)
-        handler.setFormatter(JsonFormatter())
-        logger.addHandler(handler)
 
     # Stdout handler: INFO and below
     if not any(
