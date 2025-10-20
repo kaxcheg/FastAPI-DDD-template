@@ -50,7 +50,13 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: kind
-      
+
+      - name: Inspect GitHub OIDC token
+        run: |
+          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
+          JWT=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL" | jq -r .value)
+          echo "$JWT" | awk -F. '{print $2}' | base64 -d 2>/dev/null | jq .
+          
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
