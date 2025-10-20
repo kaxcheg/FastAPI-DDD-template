@@ -6,11 +6,8 @@ on:
     types: [completed]
   workflow_dispatch:
     inputs:
-      ci_run_id:
-        description: "CI run_id for digest"
-        required: true
-      app_version:
-        description: "app version"
+      api_version:
+        description: "api version"
         required: true
 
 concurrency:
@@ -35,6 +32,9 @@ jobs:
     env:
       RELEASE: fastapi-ddd-template
       NAMESPACE: ci-runner
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
 
     steps:
       - name: Checkout
@@ -52,26 +52,26 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: kind
+      
+      - name: Set REPOSITORY (lowercased)
+        run: echo "REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - name: Download digest artifact (if provided)
-        if: ${{ github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch' }}
-        uses: actions/download-artifact@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: digest
-          path: .
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.ci_run_id }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Read digest from artifact (if exists) and export
-        id: read_export_digest
+      - name: Get ECR image digest
+        id: digest
         run: |
-          D=$(cat image_digest_*.txt | tr -d '\n') 
-          if ! echo "$D" | grep -q '^sha256:'; then
-            echo "Invalid digest in file: $D"; exit 1
-          fi
-          DIGEST="$(echo "$D" | sed 's/^sha256://')"
-          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
-          echo "Digest resolved: $DIGEST"
+          TAG=staging-${{ github.sha }}
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "$REPOSITORY" \
+            --image-ids imageTag="$TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
@@ -97,9 +97,6 @@ jobs:
             FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
           YAML
 
-      - name: Set IMAGE_REPOSITORY (lowercased)
-        run: echo "IMAGE_REPOSITORY=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-
       - name: Derive API_VERSION
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
@@ -110,7 +107,7 @@ jobs:
           if [[ "$BRANCH" == release/* ]]; then
             echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
           else
-            echo "API_VERSION=${{ inputs.app_version }}" >> $GITHUB_ENV
+            echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
           fi
 
       - name: Helm upgrade
@@ -118,7 +115,7 @@ jobs:
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
             -f deploy/helm/values-ci-runner.yaml \
-            --set image.repository="$IMAGE_REPOSITORY" \
+            --set image.repository="$REGISTRY/$REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
