@@ -72,7 +72,9 @@ jobs:
             --image-ids imageTag="$TAG" \
             --query 'imageDetails[0].imageDigest' \
             --output text)
-          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_OUTPUT
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          echo "Found digest: $DIGEST"
 
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
