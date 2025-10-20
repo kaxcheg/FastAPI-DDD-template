@@ -16,11 +16,8 @@ concurrency:
 
 permissions:
   contents: read
-  packages: read
   actions: read
-
-env:
-  REGISTRY: ghcr.io
+  id-token: write
 
 jobs:
   deploy-ci-runner:
@@ -33,6 +30,7 @@ jobs:
       RELEASE: fastapi-ddd-template
       NAMESPACE: ci-runner
       AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 
@@ -53,9 +51,6 @@ jobs:
         with:
           cluster_name: kind
       
-      - name: Set REPOSITORY (lowercased)
-        run: echo "REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -67,7 +62,7 @@ jobs:
         run: |
           TAG=staging-${{ github.sha }}
           DIGEST=$(aws ecr describe-images \
-            --repository-name "$REPOSITORY" \
+            --repository-name "$ECR_REPOSITORY" \
             --image-ids imageTag="$TAG" \
             --query 'imageDetails[0].imageDigest' \
             --output text)
@@ -110,12 +105,16 @@ jobs:
             echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
           fi
 
+      - name: Get registry
+        run: |
+          echo "REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+          
       - name: Helm upgrade
         run: |
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
             -f deploy/helm/values-ci-runner.yaml \
-            --set image.repository="$REGISTRY/$REPOSITORY" \
+            --set image.repository="$REGISTRY/$ECR_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
