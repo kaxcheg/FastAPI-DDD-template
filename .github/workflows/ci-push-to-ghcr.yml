@@ -1,4 +1,4 @@
-name: CI build & push to ghcr
+name: CI build & push to GHCR
 
 on:
   # push:
@@ -22,9 +22,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-      version: ${{ steps.meta.outputs.version }}
+    # outputs:
+    #   digest: ${{ steps.build.outputs.digest }}
+    #   version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,14 +34,14 @@ jobs:
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
 
-      - name: Derive version from branch (release/x.y.z)
-        id: meta
-        run: |
-          VERSION="${GITHUB_REF_NAME#release/}"
-          if [ -z "$VERSION" ] || ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Branch name must be release/x.y.z"; exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # - name: Derive version from branch (release/x.y.z)
+      #   id: meta
+      #   run: |
+      #     VERSION="${GITHUB_REF_NAME#release/}"
+      #     if [ -z "$VERSION" ] || ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+      #       echo "Branch name must be release/x.y.z"; exit 1
+      #     fi
+      #     echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -67,12 +67,12 @@ jobs:
           provenance: false
           sbom: false
 
-      - name: Save digest artifact with version
-        run: echo "${{ steps.build.outputs.digest }}" > image_digest_${{ steps.meta.outputs.version }}.txt
+      # - name: Save digest artifact with version
+      #   run: echo "${{ steps.build.outputs.digest }}" > image_digest_${{ steps.meta.outputs.version }}.txt
 
-      - name: Upload digest artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest
-          path: image_digest_${{ steps.meta.outputs.version }}.txt
+      # - name: Upload digest artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: digest
+      #     path: image_digest_${{ steps.meta.outputs.version }}.txt
 
