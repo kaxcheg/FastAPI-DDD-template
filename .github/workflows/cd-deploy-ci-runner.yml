@@ -74,6 +74,17 @@ jobs:
             --output text)
           echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_OUTPUT
 
+      - name: Create/Update ECR imagePullSecret
+        env:
+          REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | \
+          kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
+            --docker-server="$REGISTRY" \
+            --docker-username=AWS \
+            --docker-password-stdin \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -122,6 +133,7 @@ jobs:
             -f deploy/helm/values-ci-runner.yaml \
             --set image.repository="$REGISTRY/$ECR_REPOSITORY" \
             --set image.digest="$IMAGE_DIGEST" \
+            --set image.pullSecrets[0]=ecr-pull \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
