@@ -74,6 +74,9 @@ jobs:
             --output text)
           echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_OUTPUT
 
+      - name: Ensure namespace exists
+        run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Create/Update ECR imagePullSecret
         env:
           REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
@@ -83,9 +86,6 @@ jobs:
             --docker-username=AWS \
             --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Ensure namespace exists
-        run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create/Update fastapi-ddd-template-secrets
         env:
