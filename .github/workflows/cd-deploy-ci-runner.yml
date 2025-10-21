@@ -63,13 +63,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Compute registry & repo path
+      - name: Compute repo path
         id: repo
         shell: bash
         run: |
-          REGISTRY="${{ steps.ecr.outputs.registry }}"
-          REPO_PATH="${REGISTRY}/staging/${ECR_REPOSITORY}"
-          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          REPO_PATH="${staging/${ECR_REPOSITORY}"
           echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Get ECR image digest
@@ -131,10 +129,6 @@ jobs:
           else
             echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
           fi
-
-      - name: Get registry
-        run: |
-          echo "REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
           
       - name: Helm upgrade
         run: |
