@@ -67,7 +67,7 @@ jobs:
         id: repo
         shell: bash
         run: |
-          REPO_PATH="${staging/${ECR_REPOSITORY}"
+          REPO_PATH="$staging/${ECR_REPOSITORY}"
           echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Get ECR image digest
