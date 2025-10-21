@@ -35,10 +35,30 @@ jobs:
     environment: ci-runner
 
     steps:
-      - name: Checkout
+      - name: Debug workflow_run payload (какой именно коммит/ветка пришли)
+        run: |
+          echo "head_branch=${{ github.event.workflow_run.head_branch }}"
+          echo "head_sha=${{ github.event.workflow_run.head_sha }}"
+          echo "repo=${{ github.event.workflow_run.repository.full_name }}"
+
+      - name: Derive ref to checkout
+        id: ref
+        shell: bash
+        run: |
+          # Если есть ветка — используем её; если ветки нет (например, триггер от тега) — используем SHA
+          if [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
+            echo "ref=refs/heads/${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact ref from triggering run
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          repository: ${{ github.event.workflow_run.repository.full_name }}
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0          # важно: чтобы SHA/ветка гарантированно подтянулись
+          fetch-tags: true        # если релизы через теги
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
