@@ -16,6 +16,7 @@ permissions:
   id-token: write
 
 env:
+  NAMESPACE: staging
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
@@ -42,6 +43,15 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute registry & repo path
+        id: repo
+        shell: bash
+        run: |
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          REPO_PATH="${REGISTRY}/${NAMESPACE}/${ECR_REPOSITORY}"
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Build & push app image to ECR
         id: build
         uses: docker/build-push-action@v6
@@ -51,7 +61,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:staging-${{ github.sha }}
+            steps.repo.outputs.repo_path:staging-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
