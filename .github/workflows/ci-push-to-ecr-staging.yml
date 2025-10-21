@@ -61,7 +61,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            steps.repo.outputs.repo_path:staging-${{ github.sha }}
+            ${{ steps.repo.outputs.repo_path }}:staging-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
