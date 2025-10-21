@@ -1,0 +1,21 @@
+api:
+  replicas: 1
+  service:
+    type: LoadBalancer
+    port: 80
+  containerPort: 8000
+  env:
+    FASTAPI_DDD_TEMPLATE_ENV: "test"
+    FASTAPI_DDD_TEMPLATE_DEBUG: "false"
+    DB_USER: "staging_db_user"
+    DB_PATH: "fastapi_ddd_template_staging_db"
+
+db:
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: local-path
+
+image:
+  # repository/digest set by workflow
+  pullSecrets: []

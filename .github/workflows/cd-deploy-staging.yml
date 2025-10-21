@@ -1,0 +1,343 @@
+name: CD deploy to staging (AWS / k3s)
+
+on:
+  workflow_run:
+    workflows: ["CI build & push to ECR"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      reset_db:
+        description: "Reset DB (uninstall release & delete PVC before deploy)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      api_version:
+        description: "Override .Values.api.version (optional)"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: cd-staging-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  RELEASE: fastapi-ddd-template
+  NAMESPACE: staging
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  LOG_GROUP: "/k3s/staging/fastapi-ddd-template"
+
+jobs:
+  deploy-staging:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: [self-hosted, ec2, staging]
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive API_VERSION
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+            if [[ "$BRANCH" == release/* ]]; then
+              echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
+            else
+              echo Wrong branch name
+            fi
+          else
+            echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
+          fi
+
+      - name: Ensure k3s installed (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! systemctl is-active --quiet k3s; then
+            curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -s -
+          fi
+          sudo mkdir -p ~/.kube
+          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+          sudo chown $(id -u):$(id -g) ~/.kube/config
+
+      - name: Ensure kubectl & helm available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v kubectl >/dev/null 2>&1; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          fi
+          if ! command -v helm >/dev/null 2>&1; then
+            curl -L https://get.helm.sh/helm-v3.15.3-linux-amd64.tar.gz -o helm.tar.gz
+            tar -xzf helm.tar.gz && sudo mv linux-amd64/helm /usr/local/bin/helm
+          fi
+
+      - name: Ensure namespace exists
+        shell: bash
+        run: |
+          kubectl get ns "$NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$NAMESPACE"
+
+      - name: Associate Elastic IP to this EC2 (idempotent)
+        env:
+          EIP_ALLOCATION_ID: ${{ vars.EIP_ALLOCATION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+          aws ec2 associate-address --allocation-id "$EIP_ALLOCATION_ID" --instance-id "$INSTANCE_ID" --allow-reassociation --region "$AWS_REGION"
+
+      - name: Open SG inbound 80/tcp (idempotent)
+        env:
+          SECURITY_GROUP_ID: ${{ vars.SECURITY_GROUP_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$SECURITY_GROUP_ID" \
+            --protocol tcp --port 80 --cidr 0.0.0.0/0 \
+            --region "$AWS_REGION" || true
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Compute registry & repo path
+        id: repo
+        shell: bash
+        run: |
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          REPO_PATH="${REGISTRY}/${NAMESPACE}/${ECR_REPOSITORY}"
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image digest by tag staging-${{ github.sha }}
+        id: digest
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          TAG="staging-${HEAD_SHA}"
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "${NAMESPACE}/${ECR_REPOSITORY}" \
+            --image-ids imageTag="$TAG" \
+            --region "$AWS_REGION" \
+            --query 'imageDetails[0].imageDigest' --output text)
+          if [[ -z "$DIGEST" || "$DIGEST" == "None" ]]; then
+            echo "Image digest not found for tag $TAG" >&2; exit 1
+          fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Create/Update ECR imagePullSecret
+        env:
+          REGISTRY: ${{ steps.repo.outputs.registry }}
+        shell: bash
+        run: |
+          kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
+            --docker-server="$REGISTRY" \
+            --docker-username=AWS \
+            --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Pull secrets from AWS Secrets Manager → K8s Secret
+        shell: bash
+        env:
+          SM_DB_ADMIN_SECRET: STAGING_DB_ADMIN_SECRET
+          SM_DB_USER_SECRET: STAGING_DB_USER_SECRET
+          SM_JWT_SECRET: STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET
+          SM_BOOTSTRAP_HASH: STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH
+        run: |
+          set -euo pipefail
+          get_secret(){ aws secretsmanager get-secret-value --secret-id "$1" --query SecretString --output text --region "$AWS_REGION"; }
+          DB_ADMIN=$(get_secret "$SM_DB_ADMIN_SECRET")
+          DB_USER_S=$(get_secret "$SM_DB_USER_SECRET")
+          JWT_SECRET=$(get_secret "$SM_JWT_SECRET")
+          BOOTSTRAP_HASH=$(get_secret "$SM_BOOTSTRAP_HASH")
+          kubectl -n "$NAMESPACE" create secret generic fastapi-ddd-template-secrets \
+            --from-literal=DB_ADMIN_SECRET="$DB_ADMIN" \
+            --from-literal=DB_USER_SECRET="$DB_USER_S" \
+            --from-literal=FASTAPI_DDD_TEMPLATE_JWT_SECRET="$JWT_SECRET" \
+            --from-literal=FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH="$BOOTSTRAP_HASH" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Ensure CloudWatch log group & retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region "$AWS_REGION" | jq -e \
+            '.logGroups[] | select(.logGroupName==env.LOG_GROUP)' >/dev/null; then
+            aws logs create-log-group --log-group-name "$LOG_GROUP" --region "$AWS_REGION"
+          fi
+          aws logs put-retention-policy --log-group-name "$LOG_GROUP" --retention-in-days 14 --region "$AWS_REGION" || true
+
+      - name: Install/Update aws-for-fluent-bit (CloudWatch)
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm repo add aws-observability https://aws.github.io/eks-charts
+          helm repo update
+          helm upgrade --install aws-for-fluent-bit aws-observability/aws-for-fluent-bit \
+            --namespace kube-system \
+            --set cloudWatch.region="$AWS_REGION" \
+            --set cloudWatch.logGroupName="$LOG_GROUP" \
+            --set cloudWatch.logStreamPrefix="app"
+
+      - name: Optional reset DB (uninstall & delete PVC)
+        if: ${{ inputs.reset_db == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm uninstall "$RELEASE" -n "$NAMESPACE" || true
+          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/component=db || true
+
+      - name: Helm upgrade (staging)
+        env:
+          IMAGE_DIGEST: ${{ steps.digest.outputs.digest }}
+          IMAGE_REPOSITORY: ${{ steps.repo.outputs.repo_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm upgrade --install "$RELEASE" deploy/helm \
+            --namespace "$NAMESPACE" \
+            -f deploy/helm/values-staging.yaml \
+            --set image.repository="$IMAGE_REPOSITORY" \
+            --set image.digest="$IMAGE_DIGEST" \
+            --set image.pullSecrets[0]=ecr-pull \
+            --set-string api.version="$API_VERSION" \
+            --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
+
+      - name: Wait rollout
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          echo "⏳ Waiting for DB Deployment..."
+          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-db --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db \
+            --for=condition=Ready --timeout=120s
+
+          echo "⏳ Waiting for DB bootstrap Job to complete..."
+          kubectl -n "$NAMESPACE" wait job/"$RELEASE"-db-bootstrap \
+            --for=condition=complete --timeout=300s
+
+          echo "⏳ Waiting for API Deployment..."
+          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-api --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api \
+            --for=condition=Ready --timeout=120s
+
+          echo "✅ Current resources for release $RELEASE:"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods \
+            -l app.kubernetes.io/instance="$RELEASE" -o wide
+
+      - name: Integration tests
+        run: |
+          make test-int
+      
+      - name: Helm smoke test
+        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
+
+      - name: E2E tests
+        run: |
+          make test-e2e
+
+      - name: Get logs on failure (db ▸ db-bootstrap ▸ api)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "::group::Summary of resources"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods -l app.kubernetes.io/instance="$RELEASE" -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.metadata.creationTimestamp | tail -n 200 || true
+          echo "::endgroup::"
+
+          echo "::group::DB: describe & logs"
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe statefulset/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-db || true
+
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::DB-BOOTSTRAP: describe & logs"
+          kubectl -n "$NAMESPACE" describe job/"$RELEASE"-db-bootstrap || true
+          for p in $(kubectl -n "$NAMESPACE" get pods -l job-name="$RELEASE"-db-bootstrap -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::API: describe & logs"
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-api || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-api || true
+
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::SMOKE: describe & logs (helm.sh/hook-name=smoke)"
+
+          for p in $(kubectl -n "$NAMESPACE" get pods \
+              -l app.kubernetes.io/instance="$RELEASE" \
+              -o name); do
+
+            hook_name="$(kubectl -n "$NAMESPACE" get "$p" -o jsonpath='{.metadata.annotations.helm\.sh/hook-name}' 2>/dev/null || true)"
+            if [ "$hook_name" = "smoke" ]; then
+              echo "--- describe $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" || true
+
+              echo "--- logs $p (current) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+
+              echo "--- logs $p (previous) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+
+              echo "--- events for $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+            fi
+          done
+
+          kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE" -o wide | grep -E 'smoke' || true
+          echo "::endgroup::"
+
+      - name: Show staging endpoint
+        env:
+          EIP_ALLOCATION_ID: ${{ vars.EIP_ALLOCATION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IP=$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOCATION_ID" --region "$AWS_REGION" --query 'Addresses[0].PublicIp' --output text)
+          echo "Staging API is expected at: http://$IP/"
