@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-db
+  name: {{ include "fastapi-ddd-template.db-name" . }}
   labels:
     {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "fastapi-ddd-template.fullname" . }}-db
+  serviceName: {{ include "fastapi-ddd-template.db-name" . }}
   replicas: 1
   selector:
     matchLabels:
@@ -38,7 +38,7 @@ spec:
             - name: POSTGRES_DB
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: "DB_PATH" } }
             - name: POSTGRES_PASSWORD_FILE
-              value: /run/secrets/{{ .Values.db.adminSecretFile }}
+              value: /run/secrets/{{ .Values.db.adminSecretPath }}
           volumeMounts:
             - { name: pgdata, mountPath: /var/lib/postgresql/data }
             - { name: db-secrets, mountPath: /run/secrets, readOnly: true }

@@ -11,13 +11,20 @@ on:
         required: true
 
 concurrency:
-  group: cd-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
+  group: cd-ci-runner-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
   cancel-in-progress: true
 
 permissions:
   contents: read
   actions: read
   id-token: write
+
+env:
+  RELEASE: fastapi-ddd-template
+  NAMESPACE: ci-runner
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
   deploy-ci-runner:
@@ -26,13 +33,6 @@ jobs:
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: ci-runner
-    env:
-      RELEASE: fastapi-ddd-template
-      NAMESPACE: ci-runner
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-
 
     steps:
       - name: Checkout
@@ -114,11 +114,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             BRANCH="${{ github.event.workflow_run.head_branch }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-          if [[ "$BRANCH" == release/* ]]; then
-            echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
+            if [[ "$BRANCH" == release/* ]]; then
+              echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
+            else
+              echo Wrong branch name
+            fi
           else
             echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
           fi

@@ -1,0 +1,30 @@
+name: CD cleanup staging (uninstall & wipe PVC)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  NAMESPACE: ${{ vars.NAMESPACE }}
+  RELEASE: fastapi-ddd-template
+
+jobs:
+  cleanup:
+    runs-on: [self-hosted, ec2, staging]
+    steps:
+      - name: Ensure k3s context
+        shell: bash
+        run: |
+          sudo mkdir -p ~/.kube
+          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+          sudo chown $(id -u):$(id -g) ~/.kube/config
+      - name: Uninstall release & delete PVC
+        shell: bash
+        run: |
+          helm uninstall "$RELEASE" -n "$NAMESPACE" || true
+          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/instance="$RELEASE" || true
+      - name: (Optional) Keep log group; no action
+        run: echo "CloudWatch logs retained by design"
