@@ -85,7 +85,7 @@ jobs:
   
   deploy_staging:
     needs: build_and_push
-    uses: ./.github/workflows/cd-deploy-ci-staging.yml
+    uses: ./.github/workflows/cd-deploy-staging.yml
     secrets: inherit
     with:
       digest: ${{ needs.build_and_push.outputs.digest }}
