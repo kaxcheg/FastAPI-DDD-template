@@ -87,6 +87,7 @@ jobs:
   deploy_ci_runner:
     needs: build_and_push
     uses: ./.github/workflows/cd-deploy-ci-runner.yml
+    secrets: inherit
     with:
       tag:  ${{ needs.build_and_push.outputs.tag }}
       digest: ${{ needs.build_and_push.outputs.digest }}
