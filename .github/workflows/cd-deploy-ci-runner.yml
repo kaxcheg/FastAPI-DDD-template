@@ -3,7 +3,6 @@ name: CD deploy to CI runner
 on:
   workflow_call:
     inputs:
-      tag:  {type: string, required: true}
       digest: {type: string, required: true}
       repo_path: {type: string, required: true}
       registry: {type: string, required: true}
@@ -21,9 +20,7 @@ permissions:
 env:
   RELEASE: fastapi-ddd-template
   NAMESPACE: ci-runner
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
   AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
   deploy-ci-runner:

@@ -1,4 +1,4 @@
-name: Build, push to ECR and promote to staging AWS
+name: Release to staging
 
 on:
   push:
@@ -24,7 +24,6 @@ jobs:
   build_and_push:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.tag.outputs.tag }}
       digest: ${{ steps.build.outputs.digest }}
       repo_path: ${{ steps.repo.outputs.repo_path }}
       registry: ${{ steps.repo.outputs.registry }}
@@ -89,7 +88,6 @@ jobs:
     uses: ./.github/workflows/cd-deploy-ci-runner.yml
     secrets: inherit
     with:
-      tag:  ${{ needs.build_and_push.outputs.tag }}
       digest: ${{ needs.build_and_push.outputs.digest }}
       repo_path: ${{ needs.build_and_push.outputs.repo_path }}
       registry: ${{ needs.build_and_push.outputs.registry }}

@@ -1,44 +1,30 @@
 name: CD deploy to staging (AWS / k3s)
 
 on:
-  workflow_run:
-    workflows: ["CI build & push to ECR"]
-    types: [completed]
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      reset_db:
-        description: "Reset DB (uninstall release & delete PVC before deploy)"
-        required: false
-        default: "false"
-        type: choice
-        options: ["false", "true"]
-      api_version:
-        description: "Override .Values.api.version (optional)"
-        required: false
-        default: ""
-        type: string
+      digest: {type: string, required: true}
+      repo_path: {type: string, required: true}
+      registry: {type: string, required: true}
 
 concurrency:
-  group: cd-staging-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
+  group: cd-staging-${{ github.ref_name || github.sha }}
   cancel-in-progress: true
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 env:
   RELEASE: fastapi-ddd-template
   NAMESPACE: staging
   AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  # ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   LOG_GROUP: "/k3s/staging/fastapi-ddd-template"
 
 jobs:
   deploy-staging:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: [self-hosted, ec2, staging]
     environment: staging
     steps:
@@ -47,15 +33,11 @@ jobs:
 
       - name: Derive API_VERSION
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            BRANCH="${{ github.event.workflow_run.head_branch }}"
-            if [[ "$BRANCH" == release/* ]]; then
-              echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
-            else
-              echo Wrong branch name
-            fi
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [[ "$REF_NAME" == release/* ]]; then
+            echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
           else
-            echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
+            echo "API_VERSION=no_version}"
           fi
 
       - name: Ensure k3s installed (idempotent)
@@ -108,46 +90,35 @@ jobs:
             --protocol tcp --port 80 --cidr 0.0.0.0/0 \
             --region "$AWS_REGION" || true
 
-      - name: Login to ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          mask-password: 'true'
+      # - name: Login to ECR
+      #   id: ecr
+      #   uses: aws-actions/amazon-ecr-login@v2
+      #   with:
+      #     mask-password: 'true'
 
-      - name: Compute registry & repo path
-        id: repo
-        shell: bash
-        run: |
-          REGISTRY="${{ steps.ecr.outputs.registry }}"
-          REPO_PATH="${REGISTRY}/${NAMESPACE}/${ECR_REPOSITORY}"
-          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
-          echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve image digest by tag staging-${{ github.sha }}
-        id: digest
-        shell: bash
-        env:
-          HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-        run: |
-          set -euo pipefail
-          TAG="staging-${HEAD_SHA}"
-          DIGEST=$(aws ecr describe-images \
-            --repository-name "${NAMESPACE}/${ECR_REPOSITORY}" \
-            --image-ids imageTag="$TAG" \
-            --region "$AWS_REGION" \
-            --query 'imageDetails[0].imageDigest' --output text)
-          if [[ -z "$DIGEST" || "$DIGEST" == "None" ]]; then
-            echo "Image digest not found for tag $TAG" >&2; exit 1
-          fi
-          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+      # - name: Resolve image digest by tag staging-${{ github.sha }}
+      #   id: digest
+      #   shell: bash
+      #   env:
+      #     HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      #   run: |
+      #     set -euo pipefail
+      #     TAG="staging-${HEAD_SHA}"
+      #     DIGEST=$(aws ecr describe-images \
+      #       --repository-name "${NAMESPACE}/${ECR_REPOSITORY}" \
+      #       --image-ids imageTag="$TAG" \
+      #       --region "$AWS_REGION" \
+      #       --query 'imageDetails[0].imageDigest' --output text)
+      #     if [[ -z "$DIGEST" || "$DIGEST" == "None" ]]; then
+      #       echo "Image digest not found for tag $TAG" >&2; exit 1
+      #     fi
+      #     echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Create/Update ECR imagePullSecret
-        env:
-          REGISTRY: ${{ steps.repo.outputs.registry }}
         shell: bash
         run: |
           kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
-            --docker-server="$REGISTRY" \
+            --docker-server=${{ inputs.registry }} \
             --docker-username=AWS \
             --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -204,17 +175,14 @@ jobs:
           kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/component=db || true
 
       - name: Helm upgrade (staging)
-        env:
-          IMAGE_DIGEST: ${{ steps.digest.outputs.digest }}
-          IMAGE_REPOSITORY: ${{ steps.repo.outputs.repo_path }}
         shell: bash
         run: |
           set -euo pipefail
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
             -f deploy/helm/values-staging.yaml \
-            --set image.repository="$IMAGE_REPOSITORY" \
-            --set image.digest="$IMAGE_DIGEST" \
+            --set image.repository=${{ inputs.repo_path }} \
+            --set image.digest=${{ inputs.digest }} \
             --set image.pullSecrets[0]=ecr-pull \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
