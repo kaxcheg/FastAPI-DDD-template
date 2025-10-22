@@ -77,14 +77,15 @@ jobs:
       - name: Wait for k3s API to be Ready
         shell: bash
         env:
-          # исключаем локальные/cluster сети из прокси, если вдруг прокси заданы
+          # держим только ОДИН ключ в env
           NO_PROXY: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16
-          no_proxy: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16
           KUBECONFIG: ${{ env.KUBECONFIG }}
         run: |
           set -euo pipefail
 
-          # Убедимся, что k3s действительно активен
+          # продублируем в нижний регистр внутри шага
+          export no_proxy="${NO_PROXY}"
+
           if ! systemctl is-active --quiet k3s; then
             echo "k3s service is not active" >&2
             sudo systemctl status k3s --no-pager || true
@@ -99,7 +100,6 @@ jobs:
               break
             fi
             sleep 2
-            # периодически печатаем логи k3s для диагностики
             if (( i % 10 == 0 )); then
               echo "--- k3s logs (last 80 lines) ---"
               sudo journalctl -u k3s --no-pager -n 80 || true
@@ -111,7 +111,6 @@ jobs:
             fi
           done
 
-          # Дополнительно дождёмся доступности через kubectl (увеличим таймаут запроса)
           for i in {1..30}; do
             if kubectl --request-timeout=10s version --short >/dev/null 2>&1; then
               kubectl get nodes -o wide || true
