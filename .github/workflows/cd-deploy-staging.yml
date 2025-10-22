@@ -74,6 +74,56 @@ jobs:
             tar -xzf helm.tar.gz && sudo mv linux-amd64/helm /usr/local/bin/helm
           fi
 
+      - name: Wait for k3s API to be Ready
+        shell: bash
+        env:
+          # исключаем локальные/cluster сети из прокси, если вдруг прокси заданы
+          NO_PROXY: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16
+          no_proxy: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          set -euo pipefail
+
+          # Убедимся, что k3s действительно активен
+          if ! systemctl is-active --quiet k3s; then
+            echo "k3s service is not active" >&2
+            sudo systemctl status k3s --no-pager || true
+            exit 1
+          fi
+
+          API="https://127.0.0.1:6443/healthz"
+          echo "Waiting for k3s API at $API ..."
+          for i in {1..60}; do
+            if curl -sk --max-time 2 "$API" | grep -q 'ok'; then
+              echo "k3s API is healthy"
+              break
+            fi
+            sleep 2
+            # периодически печатаем логи k3s для диагностики
+            if (( i % 10 == 0 )); then
+              echo "--- k3s logs (last 80 lines) ---"
+              sudo journalctl -u k3s --no-pager -n 80 || true
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "Timeout waiting for k3s API" >&2
+              sudo journalctl -u k3s --no-pager -n 200 || true
+              exit 1
+            fi
+          done
+
+          # Дополнительно дождёмся доступности через kubectl (увеличим таймаут запроса)
+          for i in {1..30}; do
+            if kubectl --request-timeout=10s version --short >/dev/null 2>&1; then
+              kubectl get nodes -o wide || true
+              break
+            fi
+            sleep 2
+            if [[ $i -eq 30 ]]; then
+              echo "kubectl cannot talk to API" >&2
+              exit 1
+            fi
+          done
+
       - name: Ensure namespace exists
         shell: bash
         run: |
