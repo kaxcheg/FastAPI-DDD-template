@@ -89,7 +89,7 @@ jobs:
           if [[ "$REF_NAME" == release/* ]]; then
             echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
           else
-            echo "API_VERSION=no_version}"
+            echo "API_VERSION=no_version"
           fi
           
       - name: Helm upgrade

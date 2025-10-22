@@ -83,9 +83,9 @@ jobs:
         run: |
           echo "Pushed: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:staging-${GITHUB_SHA}"
   
-  deploy_ci_runner:
+  deploy_staging:
     needs: build_and_push
-    uses: ./.github/workflows/cd-deploy-ci-runner.yml
+    uses: ./.github/workflows/cd-deploy-ci-staging.yml
     secrets: inherit
     with:
       digest: ${{ needs.build_and_push.outputs.digest }}
