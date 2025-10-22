@@ -6,6 +6,7 @@ on:
       digest: {type: string, required: true}
       repo_path: {type: string, required: true}
       registry: {type: string, required: true}
+      reset_db: {type: string, required: false, default: "false"}
 
 concurrency:
   group: cd-staging-${{ github.ref_name || github.sha }}
@@ -40,16 +41,25 @@ jobs:
             echo "API_VERSION=no_version"
           fi
 
-      - name: Ensure k3s installed (idempotent)
+      - name: Ensure k3s installed (idempotent) + kubeconfig for runner user
         shell: bash
         run: |
           set -euo pipefail
+
+          # 1) Install k3s with readable kubeconfig (if not already running)
           if ! systemctl is-active --quiet k3s; then
-            curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -s -
+            curl -sfL https://get.k3s.io | \
+              INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -s -
           fi
-          sudo mkdir -p ~/.kube
-          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-          sudo chown $(id -u):$(id -g) ~/.kube/config
+
+          # 2) Copy kubeconfig to the runner user's home and own it
+          UID_NUM=$(id -u)
+          GID_NUM=$(id -g)
+          install -d -m 755 "$HOME/.kube"
+          sudo install -m 600 -o "$UID_NUM" -g "$GID_NUM" /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
+
+          # 3) Export for all subsequent steps
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
 
       - name: Ensure kubectl & helm available
         shell: bash
