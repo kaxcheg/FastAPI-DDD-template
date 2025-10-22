@@ -1,5 +1,4 @@
-
-name: CI build & push to ECR
+name: Build, push to ECR and promote to staging AWS
 
 on:
   push:
@@ -21,8 +20,13 @@ env:
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
-  build:
+  build_and_push:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      digest: ${{ steps.build.outputs.digest }}
+      repo_path: ${{ steps.repo.outputs.repo_path }}
+      registry: ${{ steps.repo.outputs.registry }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,6 +71,23 @@ jobs:
           provenance: false
           sbom: false
 
+      - name: Export tag
+        id: tag
+        run: |
+          TAG="staging-${{ github.sha }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Debug
+        run: echo "Image tag is ${{ steps.tag.outputs.tag }}"
       - name: Log image reference
         run: |
           echo "Pushed: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:staging-${GITHUB_SHA}"
+  
+  deploy_ci_runner:
+    needs: build_and_push
+    uses: ./.github/workflows/cd-deploy-ci-runner.yml
+    with:
+      tag:  ${{ needs.build_and_push.outputs.tag }}
+      digest: ${{ needs.build_and_push.outputs.digest }}
+      repo_path: ${{ needs.build_and_push.outputs.repo_path }}
+      registry: ${{ needs.build_and_push.outputs.registry }}

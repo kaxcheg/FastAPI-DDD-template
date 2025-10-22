@@ -1,17 +1,16 @@
 name: CD deploy to CI runner
 
 on:
-  workflow_run:
-    workflows: ["CI build & push to ECR"]
-    types: [completed]
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      api_version:
-        description: "api version"
-        required: true
+      tag:  {type: string, required: true}
+      digest: {type: string, required: true}
+      repo_path: {type: string, required: true}
+      registry: {type: string, required: true}
+
 
 concurrency:
-  group: cd-ci-runner-${{ github.event.workflow_run.head_branch || github.ref || github.sha }}
+  group: cd-ci-runner-${{ github.ref_name || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -22,43 +21,21 @@ permissions:
 env:
   RELEASE: fastapi-ddd-template
   NAMESPACE: ci-runner
-  AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
   deploy-ci-runner:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: ci-runner
 
     steps:
-      - name: Debug workflow_run payload (какой именно коммит/ветка пришли)
-        run: |
-          echo "head_branch=${{ github.event.workflow_run.head_branch }}"
-          echo "head_sha=${{ github.event.workflow_run.head_sha }}"
-          echo "repo=${{ github.event.workflow_run.repository.full_name }}"
 
-      - name: Derive ref to checkout
-        id: ref
-        shell: bash
-        run: |
-          # Если есть ветка — используем её; если ветки нет (например, триггер от тега) — используем SHA
-          if [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
-            echo "ref=refs/heads/${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout exact ref from triggering run
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.workflow_run.repository.full_name }}
-          ref: ${{ steps.ref.outputs.ref }}
-          fetch-depth: 0          # важно: чтобы SHA/ветка гарантированно подтянулись
-          fetch-tags: true        # если релизы через теги
+          fetch-depth: 0
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
@@ -70,12 +47,6 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: kind
-
-      - name: Inspect GitHub OIDC token
-        run: |
-          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
-          JWT=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL" | jq -r .value)
-          echo "$JWT" | awk -F. '{print $2}' | base64 -d 2>/dev/null | jq .
           
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -83,35 +54,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Compute repo path
-        id: repo
-        shell: bash
-        run: |
-          REPO_PATH="$staging/${ECR_REPOSITORY}"
-          echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
-
-      - name: Get ECR image digest
-        id: digest
-        run: |
-          TAG=staging-${{ github.sha }}
-          DIGEST=$(aws ecr describe-images \
-            --repository-name  ${{ steps.repo.outputs.repo_path }} \
-            --image-ids imageTag="$TAG" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)
-          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_OUTPUT"
-          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
-          echo "Found digest: $DIGEST"
-
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create/Update ECR imagePullSecret
-        env:
-          REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
           kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
-            --docker-server="$REGISTRY" \
+            --docker-server=${{ inputs.registry }} \
             --docker-username=AWS \
             --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -139,15 +88,11 @@ jobs:
 
       - name: Derive API_VERSION
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            BRANCH="${{ github.event.workflow_run.head_branch }}"
-            if [[ "$BRANCH" == release/* ]]; then
-              echo "API_VERSION=${BRANCH#release/}" >> $GITHUB_ENV
-            else
-              echo Wrong branch name
-            fi
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [[ "$REF_NAME" == release/* ]]; then
+            echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
           else
-            echo "API_VERSION=${{ inputs.api_version }}" >> $GITHUB_ENV
+            echo Wrong branch name
           fi
           
       - name: Helm upgrade
@@ -155,8 +100,8 @@ jobs:
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
             -f deploy/helm/values-ci-runner.yaml \
-            --set image.repository=${{ steps.repo.outputs.repo_path }} \
-            --set image.digest="$IMAGE_DIGEST" \
+            --set image.repository=${{ inputs.repo_path }} \
+            --set image.digest=${{ inputs.digest }} \
             --set image.pullSecrets[0]=ecr-pull \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
