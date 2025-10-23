@@ -46,19 +46,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 1) Install k3s with readable kubeconfig (if not already running)
+          # возьмём приватный IP интерфейса eth0
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+
+          # ставим/чиним k3s с правильными адресами
           if ! systemctl is-active --quiet k3s; then
             curl -sfL https://get.k3s.io | \
-              INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -s -
+              INSTALL_K3S_EXEC="--disable traefik \
+                                --write-kubeconfig-mode 644 \
+                                --node-ip ${PRIVATE_IP} \
+                                --flannel-iface eth0" \
+              sh -s -
+          else
+            # убедимся, что флаги применены (если k3s уже стоял «криво»)
+            if ! grep -q -- "--node-ip ${PRIVATE_IP}" /etc/systemd/system/k3s.service 2>/dev/null; then
+              sudo sed -i "s|^ExecStart=.*|ExecStart=/usr/local/bin/k3s server --disable traefik --write-kubeconfig-mode 644 --node-ip ${PRIVATE_IP} --flannel-iface eth0|" /etc/systemd/system/k3s.service
+              sudo systemctl daemon-reload
+              sudo systemctl restart k3s
+            fi
           fi
 
-          # 2) Copy kubeconfig to the runner user's home and own it
-          UID_NUM=$(id -u)
-          GID_NUM=$(id -g)
+          # kubeconfig для пользователя раннера
           install -d -m 755 "$HOME/.kube"
-          sudo install -m 600 -o "$UID_NUM" -g "$GID_NUM" /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
-
-          # 3) Export for all subsequent steps
+          sudo install -m 600 -o "$(id -u)" -g "$(id -g)" /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
           echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
 
       - name: Ensure kubectl & helm available
@@ -73,45 +84,6 @@ jobs:
             curl -L https://get.helm.sh/helm-v3.15.3-linux-amd64.tar.gz -o helm.tar.gz
             tar -xzf helm.tar.gz && sudo mv linux-amd64/helm /usr/local/bin/helm
           fi
-
-      - name: Normalize k3s networking (node-ip, flannel-iface, sysctl) + restart
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # 1) Определим локальный приватный IP из IMDS (если недоступен — fallback на hostname -I)
-          LOCAL_IP="$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/local-ipv4 || true)"
-          if [[ -z "${LOCAL_IP}" ]]; then
-            LOCAL_IP="$(hostname -I | awk '{print $1}')"
-          fi
-          echo "Detected local IP: ${LOCAL_IP}"
-
-          # 2) Подготовим конфиг k3s с явными сетевыми параметрами
-          sudo mkdir -p /etc/rancher/k3s
-          sudo tee /etc/rancher/k3s/config.yaml >/dev/null <<EOF
-          write-kubeconfig-mode: "0644"
-          disable:
-            - traefik
-          node-ip: "${LOCAL_IP}"
-          flannel-iface: "eth0"
-          # При желании можно закрепить сети явно (совпадают с дефолтами k3s):
-          #cluster-cidr: "10.42.0.0/16"
-          #service-cidr: "10.43.0.0/16"
-          EOF
-
-          # 3) Включим нужные sysctl для CNI/маршрутизации
-          sudo modprobe br_netfilter || true
-          sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
-          sudo sysctl -w net.ipv4.ip_forward=1
-
-          # 4) Перезапустим k3s, чтобы конфиг применился
-          sudo systemctl restart k3s
-
-          # 5) Покажем быстрый статус и интерфейсы
-          sudo systemctl is-active --quiet k3s || (sudo systemctl status k3s --no-pager; exit 1)
-          ip addr show eth0 || true
-          ip route || true
-
 
       - name: Wait for k3s API to be Ready
         shell: bash
