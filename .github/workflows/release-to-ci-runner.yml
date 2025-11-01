@@ -1,4 +1,4 @@
-name: Release to staging
+name: Release to CI runner
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
   build_and_push:
     uses: ./.github/workflows/ci-push-to-ecr.yml
     secrets: inherit
-    
+
   deploy_staging:
     needs: build_and_push
     uses: ./.github/workflows/cd-deploy-staging.yml
