@@ -1,7 +1,7 @@
 name: CI push to ECR
 
 on:
-  workflow_call: {}
+  workflow_call:
     outputs:
       digest:
         description: "Image content-addressable digest"
