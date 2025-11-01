@@ -15,7 +15,7 @@ logger = get_logger(__name__)  # Reuse module-level logger.
 def create_app() -> FastAPI:
     """Create and configure FastAPI application instance."""
 
-    app = FastAPI(title="FastAPI DDD template")
+    app = FastAPI(title="dddapitpl")
     app.include_router(users.router, tags=["User"])
     app.include_router(login.router, tags=["Login"])
     return app

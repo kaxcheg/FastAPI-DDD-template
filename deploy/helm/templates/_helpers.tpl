@@ -1,8 +1,8 @@
-{{- define "fastapi-ddd-template.name" -}}
+{{- define "dddapitpl.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "fastapi-ddd-template.fullname" -}}
+{{- define "dddapitpl.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -10,30 +10,30 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "fastapi-ddd-template.db-name" -}}
-{{ include "fastapi-ddd-template.name" . }}-db
+{{- define "dddapitpl.db-name" -}}
+{{ include "dddapitpl.name" . }}-db
 {{- end -}}
 
-{{- define "fastapi-ddd-template.api-name" -}}
-{{ include "fastapi-ddd-template.name" . }}-api
+{{- define "dddapitpl.api-name" -}}
+{{ include "dddapitpl.name" . }}-api
 {{- end -}}
 
-{{- define "fastapi-ddd-template.labels" -}}
-app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
+{{- define "dddapitpl.labels" -}}
+app.kubernetes.io/name: {{ include "dddapitpl.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/part-of: {{ include "fastapi-ddd-template.name" . }}
+app.kubernetes.io/part-of: {{ include "dddapitpl.name" . }}
 app.kubernetes.io/version: {{ default .Chart.AppVersion .Values.api.version | quote }}
 {{- end -}}
 
 # component: api|db|db-bootstrap
-{{- define "fastapi-ddd-template.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fastapi-ddd-template.name" . }}
+{{- define "dddapitpl.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "dddapitpl.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: {{ .component | quote }}
 {{- end -}}
 
 # repo@sha256:digest или repo:tag
-{{- define "fastapi-ddd-template.image" -}}
+{{- define "dddapitpl.image" -}}
 {{- $repo := .repository -}}
 {{- $digest := .digest | default "" -}}
 {{- $tag := .tag | default "latest" -}}

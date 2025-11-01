@@ -11,20 +11,20 @@ image:
 config:
   enabled: true
   data:
-    FASTAPI_DDD_TEMPLATE_ENV: ""
-    FASTAPI_DDD_TEMPLATE_DEBUG: ""
-    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: "HS256"
-    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: "30"
+    ENV: ""
+    DEBUG: ""
+    JWT_ALGORITHM: "HS256"
+    JWT_TOKEN_EXPIRY_TIME: "30"
     DB_ADMIN: "postgres"
     DB_USER: ""
     DB_PATH: ""
     DB_DRIVER: "postgresql+asyncpg"
-    DB_TABLE_SCHEMA: "fastapi_ddd_template"
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: "true"
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: "admin"
+    DB_TABLE_SCHEMA: "dddapitpl"
+    BOOTSTRAP_FLAG: "true"
+    BOOTSTRAP_ADMIN: "admin"
 
 secrets:
-  existingName: "fastapi-ddd-template-secrets"
+  existingName: "dddapitpl-secrets"
 
 api:
   version: ""
@@ -43,21 +43,21 @@ api:
     limits:   { cpu: "250m", memory: "256Mi" }
 
   envFromConfigKeys:
-    - FASTAPI_DDD_TEMPLATE_ENV
-    - FASTAPI_DDD_TEMPLATE_DEBUG
-    - FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM
-    - FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME
+    - ENV
+    - DEBUG
+    - JWT_ALGORITHM
+    - JWT_TOKEN_EXPIRY_TIME
     - DB_DRIVER
     - DB_HOST
     - DB_PATH
     - DB_USER
     - DB_TABLE_SCHEMA
-    - FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG
-    - FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN
+    - BOOTSTRAP_FLAG
+    - BOOTSTRAP_ADMIN
 
   secretFilesPath:
-    FASTAPI_DDD_TEMPLATE_JWT_SECRET_PATH: fastapi_ddd_template_jwt_secret
-    BOOTSTRAP_ADMIN_PASSWORD_HASH_PATH: fastapi_ddd_template_bootstrap_admin_password_hash
+    JWT_SECRET_PATH: jwt_secret
+    BOOTSTRAP_ADMIN_PASSWORD_HASH_PATH: bootstrap_admin_password_hash
     DB_USER_SECRET_PATH: db_user_secret
 
 db:

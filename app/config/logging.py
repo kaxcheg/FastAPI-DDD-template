@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
-from logging.handlers import RotatingFileHandler
-from logging import StreamHandler
-from pathlib import Path
 from typing import Any, Final
 
 from app.config import get_settings
+
 
 class JsonFormatter(logging.Formatter):
     """Format log record as JSON string and mask sensitive fields."""
@@ -75,7 +72,7 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
     cfg = get_settings()
-    logger.setLevel(logging.DEBUG if cfg.FASTAPI_DDD_TEMPLATE_DEBUG else logging.INFO)
+    logger.setLevel(logging.DEBUG if cfg.DEBUG else logging.INFO)
 
     # Stdout handler: INFO and below
     if not any(

@@ -2,15 +2,15 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-db-bootstrap
+  name: {{ include "dddapitpl.fullname" . }}-db-bootstrap
   labels:
-    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+    {{- include "dddapitpl.labels" . | nindent 4 }}
 spec:
   backoffLimit: {{ .Values.dbBootstrap.backoffLimit }}
   template:
     metadata:
       labels:
-        {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
+        {{- include "dddapitpl.labels" . | nindent 8 }}
         app.kubernetes.io/component: "db-bootstrap"
     spec:
       restartPolicy: OnFailure
@@ -32,7 +32,7 @@ spec:
               done
               echo "Postgres not ready in time"; exit 1
           env:
-          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.dbBootstrap.envFromConfigKeys }}
             - name: {{ $k }}
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
@@ -43,7 +43,7 @@ spec:
           imagePullPolicy: {{ .Values.dbBootstrap.image.pullPolicy }}
           command: ["/bin/bash","-lc","bash /bootstrap/bootstrap_db.sh"]
           env:
-          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.dbBootstrap.envFromConfigKeys }}
             - name: {{ $k }}
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
@@ -56,7 +56,7 @@ spec:
       volumes:
         - name: bootstrap
           configMap:
-            name: {{ include "fastapi-ddd-template.fullname" . }}-db-bootstrap-scripts
+            name: {{ include "dddapitpl.fullname" . }}-db-bootstrap-scripts
             defaultMode: 0555
         - name: db-bootstrap-secrets
           secret:

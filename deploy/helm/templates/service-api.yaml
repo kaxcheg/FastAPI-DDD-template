@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-api
+  name: {{ include "dddapitpl.fullname" . }}-api
   labels:
-    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+    {{- include "dddapitpl.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.api.service.type }}
   selector:
@@ -12,7 +12,7 @@ spec:
     {{- $_ := set $ctx "Release" .Release -}}
     {{- $_ := set $ctx "Values" .Values -}}
     {{- $_ := set $ctx "Capabilities" .Capabilities -}}
-    {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 4 }}
+    {{- include "dddapitpl.selectorLabels" $ctx | nindent 4 }}
   ports:
     - name: http
       port: {{ .Values.api.service.port }}

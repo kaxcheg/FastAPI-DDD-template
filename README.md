@@ -1,6 +1,6 @@
-# FastAPI DDD Template
+# dddapitpl
 
-**FastAPI‑DDD Template** is a sample project that demonstrates how to
+**dddapitpl** is a sample project that demonstrates how to
 organise a FastAPI application using SOLID and Domain‑Driven Design (DDD)
 principles. It is built with FastAPI, SQLAlchemy and Pydantic and
 provides a minimal yet complete example of how to structure a service
@@ -97,8 +97,8 @@ web framework or persistence mechanism without touching the core logic.
 1.  **Clone the repository**
 
 ```
-git clone https://github.com/kaxcheg/FastAPI-DDD-template.git
-cd FastAPI-DDD-template
+git clone https://github.com/kaxcheg/dddapitpl.git
+cd dddapitpl
 ```
 
 2.  **Configure environment variables**
@@ -142,8 +142,8 @@ The interactive documentation will be available at
 
 6.  **Create an admin user (optional)**
 
-To bootstrap an initial administrator, set `FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG=true`
-and provide `FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN` and `FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH` (bcrypt hash) in
+To bootstrap an initial administrator, set `BOOTSTRAP_FLAG=true`
+and provide `BOOTSTRAP_ADMIN` and `BOOTSTRAP_ADMIN_PASSWORD_HASH` (bcrypt hash) in
 your environment. Then run:
 
 ```
@@ -207,7 +207,7 @@ To run the application together with PostgreSQL using Docker Compose:
 Use the provided `ci-cd/Dockerfile` to build the image:
 
 ```
-docker build -t fastapi_ddd_template_app:0.1.0 -f ci-cd/Dockerfile .
+docker build -t dddapitpl-app:0.1.0 -f ci-cd/Dockerfile .
 ```
 
 2.  **Use the included compose file**

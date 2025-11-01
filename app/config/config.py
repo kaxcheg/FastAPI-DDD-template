@@ -16,12 +16,12 @@ class BaseConfig(BaseSettings):
         extra="ignore",
     )
 
-    FASTAPI_DDD_TEMPLATE_ENV: Literal["dev", "test", "prod"]
-    FASTAPI_DDD_TEMPLATE_DEBUG: bool
+    ENV: Literal["dev", "test", "prod"]
+    DEBUG: bool
 
-    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: str
-    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: int
-    FASTAPI_DDD_TEMPLATE_JWT_SECRET: SecretStr
+    JWT_ALGORITHM: str
+    JWT_TOKEN_EXPIRY_TIME: int
+    JWT_SECRET: SecretStr
 
     DB_PATH: str
     DB_HOST: str
@@ -31,18 +31,16 @@ class BaseConfig(BaseSettings):
     DB_USER_SECRET: SecretStr
     DB_TABLE_SCHEMA: str
 
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: bool
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: str
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
+    BOOTSTRAP_FLAG: bool
+    BOOTSTRAP_ADMIN: str
+    BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME")
+    @field_validator("JWT_TOKEN_EXPIRY_TIME")
     @classmethod
     def _positive(cls, v: int) -> int:
         """Ensure token expiry is positive."""
         if v <= 0:
-            raise ValueError(
-                "FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME must be positive"
-            )
+            raise ValueError("JWT_TOKEN_EXPIRY_TIME must be positive")
         return v
 
     @property
@@ -67,12 +65,12 @@ class DevConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("DEBUG")
     @classmethod
     def _enforce_debug_true(cls, v: bool) -> bool:
-        """Ensure FASTAPI_DDD_TEMPLATE_DEBUG is True in development."""
+        """Ensure DEBUG is True in development."""
         if not v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be True in development")
+            raise ValueError("DEBUG must be True in development")
         return v
 
 
@@ -85,12 +83,12 @@ class TestConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("DEBUG")
     @classmethod
     def _enforce_debug_false(cls, v: bool) -> bool:
-        """Ensure FASTAPI_DDD_TEMPLATE_DEBUG is False in testing."""
+        """Ensure DEBUG is False in testing."""
         if v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be False in testing")
+            raise ValueError("DEBUG must be False in testing")
         return v
 
 
@@ -103,30 +101,30 @@ class ProdConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("DEBUG")
     @classmethod
     def _enforce_debug_false(cls, v: bool) -> bool:
         """Ensure DEBUG is False in production."""
         if v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be False in production")
+            raise ValueError("DEBUG must be False in production")
         return v
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_JWT_SECRET")
+    @field_validator("JWT_SECRET")
     @classmethod
     def _check_secret(cls, v: SecretStr) -> SecretStr:
         """Deny weak secrets in production."""
         if "secret" in v.get_secret_value():
-            raise ValueError("Invalid FASTAPI_DDD_TEMPLATE_JWT_SECRET in production")
+            raise ValueError("Invalid JWT_SECRET in production")
         return v
 
 
 # Cache config instance to avoid recreating settings on every import.
 @lru_cache
 def get_settings() -> BaseConfig:
-    """Return singleton config by FASTAPI_DDD_TEMPLATE_ENV."""
-    env = os.getenv("FASTAPI_DDD_TEMPLATE_ENV")
+    """Return singleton config by ENV."""
+    env = os.getenv("ENV")
     if not env:
-        raise ValueError("FASTAPI_DDD_TEMPLATE_ENV cannot be empty")
+        raise ValueError("ENV cannot be empty")
 
     match env.lower():
         case "dev":
@@ -136,4 +134,4 @@ def get_settings() -> BaseConfig:
         case "prod":
             return ProdConfig()  # type: ignore[call-arg]
         case _:
-            raise ValueError(f"Unknown FASTAPI_DDD_TEMPLATE_ENV value: {env.lower()}")
+            raise ValueError(f"Unknown ENV value: {env.lower()}")

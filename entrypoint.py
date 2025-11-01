@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Container entrypoint: wait DB, migrate, bootstrap, exec CMD."""
 
+from __future__ import annotations
+
 import argparse
 import os
 import subprocess
@@ -9,7 +11,17 @@ import time
 from socket import AF_INET, SOCK_STREAM, socket
 
 
-def wait_for_db(host: str, port: int, timeout: int = 30) -> None:
+def _env_bool(name: str, default: bool | None = None) -> bool:
+    """Parse boolean-like env values: 1/true/yes/on."""
+    val = os.getenv(name)
+    if val is None:
+        if default is None:
+            raise SystemExit(f"[entrypoint] {name} must be set")
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def wait_for_db(host: str, port: int = 5432, timeout: int = 60) -> None:
     """Wait until TCP host:port is reachable or timeout."""
     start = time.time()
     while True:
@@ -17,63 +29,71 @@ def wait_for_db(host: str, port: int, timeout: int = 30) -> None:
             with socket(AF_INET, SOCK_STREAM) as s:
                 s.settimeout(2)
                 s.connect((host, port))
-                print(f"[entrypoint] DB ready in {time.time() - start:.1f}s")
-                return
+            elapsed = time.time() - start
+            print(f"[entrypoint] DB ready in {elapsed:.1f}s ({host}:{port})")
+            return
         except OSError:
             if time.time() - start > timeout:
-                sys.exit(f"[entrypoint] DB {host}:{port} unreachable")
+                raise SystemExit(f"[entrypoint] DB {host}:{port} unreachable after {timeout}s")
             time.sleep(1)
 
 
-def run_cmd(cmd: list[str]) -> None:
-    """Run subprocess and exit on failure."""
-    res = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
+def run(cmd: list[str]) -> None:
+    """Run a subprocess and print captured output on failure."""
+    print(f"[entrypoint] $ {' '.join(cmd)}")
+    res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode:
-        sys.exit(f"[entrypoint] command failed: {' '.join(cmd)}")
+        print(f"[entrypoint] command failed: {' '.join(cmd)} (exit {res.returncode})")
+        if res.stdout:
+            print("[stdout]")
+            print(res.stdout)
+        if res.stderr:
+            print("[stderr]")
+            print(res.stderr)
+        sys.exit(1)
 
+def migrate_and_bootstrap() -> None:
+    """Apply migrations; optionally run bootstrap script."""
+    run(["alembic", "upgrade", "head"])
+    if _env_bool("BOOTSTRAP_FLAG"):
+        run(["python", "-m", "app.scripts.bootstrap"])
+    else:
+        print("[entrypoint] BOOTSTRAP_FLAG is false → skip bootstrap")
 
-def bootstrap() -> None:
-    """Run migrations after DB is up."""
-    run_cmd(["python", "-m", "app.scripts.bootstrap"])
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Container entrypoint for API")
     _, cmd = parser.parse_known_args()
-    
     if not cmd:
-            sys.exit("[entrypoint] no CMD provided")
-    
-    db_host_key = next((key for key in os.environ if key.endswith("DB_HOST")), None)
-    # db_port_key = next((key for key in os.environ if key.endswith("DB_PORT")), None)
+        raise SystemExit("[entrypoint] no CMD provided")
 
+    db_host_key = next((k for k in os.environ if k.endswith("DB_HOST")), None)
     if not db_host_key:
-        raise RuntimeError("[entrypoint] DB_HOST var not found")
+        raise SystemExit("[entrypoint] DB_HOST env var not found (no *DB_HOST key)")
+    db_host = os.getenv(db_host_key)
+    if not db_host:
+        raise SystemExit(f"[entrypoint] {db_host_key} is set but empty")
 
-    host = os.getenv(db_host_key)
-    if not host:
-        raise RuntimeError(f"[entrypoint] {db_host_key} is not set")
+    wait_for_db(db_host, 5432, 60)
+    migrate_and_bootstrap()
 
+    if os.getenv("DEBUG") == "true":
+        uvicorn_args = cmd[cmd.index("uvicorn")+1:]  # ['api.http.main:app', '--host', '0.0.0.0', '--port', '8000']
 
-    # if not db_port_key:
-    #     port = 5432
-    # else:
-    #     port = os.getenv(db_port_key, 5432)
-
-    wait_for_db(host, 5432, 60)
-    run_cmd(["alembic", "upgrade", "head"])
-
-    bootstrap_flag = os.getenv("FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG")
-    if bootstrap_flag is None:
-        sys.exit("[entrypoint] FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG must be set")
-
-    if not bootstrap_flag:
-        print("[entrypoint] Bootstrap flag is false. Proceeding without bootstrap.")
-        sys.exit(0)
-    else:
-        bootstrap()
-
+        cmd = [
+            "python",
+            "-Xfrozen_modules=off",
+            "-m", "debugpy",
+            "--listen", "0.0.0.0:5678",
+            "--wait-for-client",
+            "-m", "uvicorn",
+            *uvicorn_args,
+        ]
+        print(f"[entrypoint] execvp → {' '.join(cmd)}")
     os.execvp(cmd[0], cmd)
+
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()
+    sys.exit(main())

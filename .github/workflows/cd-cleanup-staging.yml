@@ -9,7 +9,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   NAMESPACE: ${{ vars.NAMESPACE }}
-  RELEASE: fastapi-ddd-template
+  RELEASE: dddapitpl
 
 jobs:
   cleanup:

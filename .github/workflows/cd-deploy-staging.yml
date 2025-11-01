@@ -18,11 +18,11 @@ permissions:
   id-token: write
 
 env:
-  RELEASE: fastapi-ddd-template
+  RELEASE: dddapitpl
   NAMESPACE: staging
   AWS_REGION: ${{ vars.AWS_REGION }}
   # ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  LOG_GROUP: "/k3s/staging/fastapi-ddd-template"
+  LOG_GROUP: "/k3s/staging/dddapitpl"
 
 jobs:
   deploy-staging:
@@ -198,8 +198,8 @@ jobs:
         env:
           SM_DB_ADMIN_SECRET: STAGING_DB_ADMIN_SECRET
           SM_DB_USER_SECRET: STAGING_DB_USER_SECRET
-          SM_JWT_SECRET: STAGING_FASTAPI_DDD_TEMPLATE_JWT_SECRET
-          SM_BOOTSTRAP_HASH: STAGING_FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH
+          SM_JWT_SECRET: STAGING_JWT_SECRET
+          SM_BOOTSTRAP_HASH: STAGING_BOOTSTRAP_ADMIN_PASSWORD_HASH
         run: |
           set -euo pipefail
           get_secret(){ aws secretsmanager get-secret-value --secret-id "$1" --query SecretString --output text --region "$AWS_REGION"; }
@@ -207,11 +207,11 @@ jobs:
           DB_USER_S=$(get_secret "$SM_DB_USER_SECRET")
           JWT_SECRET=$(get_secret "$SM_JWT_SECRET")
           BOOTSTRAP_HASH=$(get_secret "$SM_BOOTSTRAP_HASH")
-          kubectl -n "$NAMESPACE" create secret generic fastapi-ddd-template-secrets \
+          kubectl -n "$NAMESPACE" create secret generic dddapitpl-secrets \
             --from-literal=DB_ADMIN_SECRET="$DB_ADMIN" \
             --from-literal=DB_USER_SECRET="$DB_USER_S" \
-            --from-literal=FASTAPI_DDD_TEMPLATE_JWT_SECRET="$JWT_SECRET" \
-            --from-literal=FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH="$BOOTSTRAP_HASH" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=BOOTSTRAP_ADMIN_PASSWORD_HASH="$BOOTSTRAP_HASH" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Ensure CloudWatch log group & retention
