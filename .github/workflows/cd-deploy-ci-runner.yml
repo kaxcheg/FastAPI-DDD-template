@@ -18,7 +18,7 @@ permissions:
   id-token: write
 
 env:
-  RELEASE: fastapi-ddd-template
+  RELEASE: dddapitpl
   NAMESPACE: ci-runner
   AWS_REGION: ${{ vars.AWS_REGION }}
 
@@ -62,25 +62,25 @@ jobs:
             --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Create/Update fastapi-ddd-template-secrets
+      - name: Create/Update dddapitpl-secrets
         env:
           DB_ADMIN_SECRET: ${{ secrets.DB_ADMIN_SECRET }}
           DB_USER_SECRET: ${{ secrets.DB_USER_SECRET }}
-          FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
-          FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD_HASH }}
         run: |
           kubectl -n "$NAMESPACE" apply -f - <<YAML
           apiVersion: v1
           kind: Secret
           metadata:
-            name: fastapi-ddd-template-secrets
+            name: dddapitpl-secrets
             namespace: "$NAMESPACE"
           type: Opaque
           stringData:
             DB_ADMIN_SECRET: "${DB_ADMIN_SECRET}"
             DB_USER_SECRET: "${DB_USER_SECRET}"
-            FASTAPI_DDD_TEMPLATE_JWT_SECRET: "${FASTAPI_DDD_TEMPLATE_JWT_SECRET}"
-            FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
+            JWT_SECRET: "${JWT_SECRET}"
+            BOOTSTRAP_ADMIN_PASSWORD_HASH: "${BOOTSTRAP_ADMIN_PASSWORD_HASH}"
           YAML
 
       - name: Derive API_VERSION

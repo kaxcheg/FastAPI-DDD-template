@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-api
+  name: {{ include "dddapitpl.fullname" . }}-api
   labels:
-    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+    {{- include "dddapitpl.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
@@ -13,11 +13,11 @@ spec:
       {{- $_ := set $ctx "Release" .Release -}}
       {{- $_ := set $ctx "Values" .Values -}}
       {{- $_ := set $ctx "Capabilities" .Capabilities -}}
-      {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 6 }}
+      {{- include "dddapitpl.selectorLabels" $ctx | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
+        {{- include "dddapitpl.labels" . | nindent 8 }}
         app.kubernetes.io/component: "api"
     spec:
       automountServiceAccountToken: false
@@ -29,7 +29,7 @@ spec:
       {{- end }}
       containers:
         - name: api
-          image: {{ include "fastapi-ddd-template.image" .Values.image }}
+          image: {{ include "dddapitpl.image" .Values.image }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports: [{ name: http, containerPort: {{ .Values.api.containerPort }} }]
           command: ["python", "./entrypoint.py"]
@@ -42,7 +42,7 @@ spec:
             - {{ .Values.api.containerPort | quote }}
 
           env:
-          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.api.envFromConfigKeys }}
             - name: {{ $k }}
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }
@@ -69,9 +69,9 @@ spec:
           secret:
             secretName: {{ .Values.secrets.existingName }}
             items:
-              - key: FASTAPI_DDD_TEMPLATE_JWT_SECRET
-                path: {{ .Values.api.secretFilesPath.FASTAPI_DDD_TEMPLATE_JWT_SECRET_PATH }}
-              - key: FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH
+              - key: JWT_SECRET
+                path: {{ .Values.api.secretFilesPath.JWT_SECRET_PATH }}
+              - key: BOOTSTRAP_ADMIN_PASSWORD_HASH
                 path: {{ .Values.api.secretFilesPath.BOOTSTRAP_ADMIN_PASSWORD_HASH_PATH }}
               - key: DB_USER_SECRET
                 path: {{ .Values.api.secretFilesPath.DB_USER_SECRET_PATH }}

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "fastapi-ddd-template.fullname" . }}-smoke"
+  name: "{{ include "dddapitpl.fullname" . }}-smoke"
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-name": smoke
@@ -14,7 +14,7 @@ spec:
         - sh
         - -c
         - >
-          URL="http://{{ include "fastapi-ddd-template.api-name" . }}:{{ .Values.api.service.port }}/health";
+          URL="http://{{ include "dddapitpl.api-name" . }}:{{ .Values.api.service.port }}/health";
           echo "GET $URL";
           for i in $(seq 1 30); do
             curl -fsSL "$URL" && echo -e "\nSMOKE OK" && exit 0;

@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-config
+  name: {{ include "dddapitpl.fullname" . }}-config
 data:
-  DB_HOST: {{ include "fastapi-ddd-template.db-name" . }}
+  DB_HOST: {{ include "dddapitpl.db-name" . }}
   {{- range $k, $v := .Values.config.data }}
   {{- if ne $k "DB_HOST" }}
   {{ $k }}: {{ $v | quote }}

@@ -2,9 +2,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "fastapi-ddd-template.fullname" . }}-db
+  name: {{ include "dddapitpl.fullname" . }}-db
   labels:
-    {{- include "fastapi-ddd-template.labels" . | nindent 4 }}
+    {{- include "dddapitpl.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -14,11 +14,11 @@ spec:
       {{- $_ := set $ctx "Release" .Release -}}
       {{- $_ := set $ctx "Values" .Values -}}
       {{- $_ := set $ctx "Capabilities" .Capabilities -}}
-      {{- include "fastapi-ddd-template.selectorLabels" $ctx | nindent 6 }}
+      {{- include "dddapitpl.selectorLabels" $ctx | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "fastapi-ddd-template.labels" . | nindent 8 }}
+        {{- include "dddapitpl.labels" . | nindent 8 }}
         app.kubernetes.io/component: "db"
     spec:
       automountServiceAccountToken: false
@@ -29,7 +29,7 @@ spec:
           ports: [{ name: psql, containerPort: {{ .Values.db.port }} }]
 
           env:
-          {{- $cfgName := (include "fastapi-ddd-template.fullname" .) | printf "%s-config" -}}
+          {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.db.envFromConfigKeys }}
             - name: {{ $k }}
               valueFrom: { configMapKeyRef: { name: {{ $cfgName | quote }}, key: {{ $k | quote }} } }

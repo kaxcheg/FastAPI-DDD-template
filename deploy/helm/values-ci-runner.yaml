@@ -6,11 +6,11 @@ image:
 config:
   enabled: true
   data:
-    FASTAPI_DDD_TEMPLATE_ENV: "test"
-    FASTAPI_DDD_TEMPLATE_DEBUG: "false"
+    ENV: "test"
+    DEBUG: "false"
 
     DB_USER: "ci_db_user"
-    DB_PATH: "fastapi_ddd_template_ci_db"
+    DB_PATH: "ci_db"
 
 api:
   replicaCount: 1

@@ -1,4 +1,4 @@
-# Makefile for fastapi_ddd_template (full, Dockerfile in repo root)
+# Makefile for dddapitpl (full, Dockerfile in repo root)
 # Usage examples:
 #   make build
 #   make up ENV_FILE=.env.dev       # docker compose with env file
@@ -17,7 +17,7 @@ SHELL := /bin/bash
 APP_DIR ?= app
 
 # Image / build settings
-IMAGE ?= fastapi_ddd_template_api
+IMAGE ?= dddapitpl-api
 TAG ?= dev
 FULL_IMAGE ?= $(IMAGE):$(TAG)
 
@@ -72,7 +72,7 @@ help:
 # Build app image using buildx. Context is repo root (Dockerfile in repo root).
 build:
 	@echo "Building (local load) $(FULL_IMAGE) from . (Dockerfile in repo root)..."
-	$(BUILDX) --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --load .
+	$(BUILDX) --build-arg WITH_DEV=true --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --load .
 
 # Build all images defined in compose (if compose has build contexts)
 compose-build:
@@ -104,6 +104,9 @@ down:
 	fi
 
 restart: down up
+
+logs-api:
+	 docker logs dddapitpl-api-1
 
 logs:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \

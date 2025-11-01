@@ -5,10 +5,10 @@ api:
     port: 80
   containerPort: 8000
   env:
-    FASTAPI_DDD_TEMPLATE_ENV: "test"
-    FASTAPI_DDD_TEMPLATE_DEBUG: "false"
+    ENV: "test"
+    DEBUG: "false"
     DB_USER: "staging_db_user"
-    DB_PATH: "fastapi_ddd_template_staging_db"
+    DB_PATH: "staging_db"
 
 db:
   persistence:
