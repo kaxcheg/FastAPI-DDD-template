@@ -18,8 +18,8 @@ permissions:
   id-token: write
 
 env:
-  RELEASE: dddapitpl
   NAMESPACE: ci-runner
+  RELEASE: dddapitpl
   AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
