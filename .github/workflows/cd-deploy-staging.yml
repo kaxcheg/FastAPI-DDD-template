@@ -9,7 +9,7 @@ on:
       reset_db: {type: string, required: false, default: "false"}
 
 concurrency:
-  group: cd-staging-${{ github.ref_name || github.sha }}
+  group: deploy-${{ env.NAMESPACE }}-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:

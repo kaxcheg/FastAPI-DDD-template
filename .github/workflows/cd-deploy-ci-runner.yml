@@ -9,7 +9,7 @@ on:
 
 
 concurrency:
-  group: cd-ci-runner-${{ github.ref_name || github.sha }}
+  group: deploy-${{ env.NAMESPACE }}-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:

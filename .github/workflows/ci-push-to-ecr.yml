@@ -15,7 +15,7 @@ on:
 
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ecr-push-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
