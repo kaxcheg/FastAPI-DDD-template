@@ -9,7 +9,7 @@ on:
 
 
 concurrency:
-  group: deploy-${{ env.NAMESPACE }}-${{ github.repository }}
+  group: deploy-ci-runner-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
