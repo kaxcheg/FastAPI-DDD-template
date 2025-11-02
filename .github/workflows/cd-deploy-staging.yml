@@ -94,16 +94,16 @@ jobs:
             # k3s уже есть — приводим конфиг к нужному виду и перезапускаем
             sudo mkdir -p /etc/rancher/k3s
             sudo tee /etc/rancher/k3s/config.yaml >/dev/null <<EOF
-              write-kubeconfig-mode: "0644"
-              disable:
-                - traefik
-                - metrics-server
-              node-ip: "${PRIVATE_IP}"
-              advertise-address: "${PRIVATE_IP}"
-              flannel-iface: "${PRIMARY_IFACE}"
-              tls-san:
-                - "127.0.0.1"
-                - "${PRIVATE_IP}"
+          write-kubeconfig-mode: "0644"
+          disable:
+            - traefik
+            - metrics-server
+          node-ip: "${PRIVATE_IP}"
+          advertise-address: "${PRIVATE_IP}"
+          flannel-iface: "${PRIMARY_IFACE}"
+          tls-san:
+            - "127.0.0.1"
+            - "${PRIVATE_IP}"
             EOF
             sudo systemctl daemon-reload
             sudo systemctl restart k3s
