@@ -49,9 +49,9 @@ jobs:
           sudo modprobe overlay || true
           sudo modprobe br_netfilter || true
           sudo tee /etc/sysctl.d/99-k3s.conf >/dev/null <<'EOF'
-            net.ipv4.ip_forward=1
-            net.bridge.bridge-nf-call-iptables=1
-            net.bridge.bridge-nf-call-ip6tables=1
+          net.ipv4.ip_forward=1
+          net.bridge.bridge-nf-call-iptables=1
+          net.bridge.bridge-nf-call-ip6tables=1
           EOF
           sudo sysctl --system || true
 
@@ -66,48 +66,33 @@ jobs:
           TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
 
+          sudo mkdir -p /etc/rancher/k3s
+          sudo tee /etc/rancher/k3s/config.yaml >/dev/null << EOF
+          write-kubeconfig-mode: "0644"
+          disable:
+            - traefik
+            - metrics-server
+          node-ip: "${PRIVATE_IP}"
+          advertise-address: "${PRIVATE_IP}"
+          flannel-iface: "${PRIMARY_IFACE}"
+          tls-san:
+            - "127.0.0.1"
+            - "${PRIVATE_IP}"
+          EOF
+
+
           # 3. если k3s не запущен — ставим «чисто», как вручную
           if ! systemctl is-active --quiet k3s; then
             if [ -x /usr/local/bin/k3s-killall.sh ]; then sudo /usr/local/bin/k3s-killall.sh || true; fi
             if [ -x /usr/local/bin/k3s-uninstall.sh ]; then sudo /usr/local/bin/k3s-uninstall.sh || true; fi
             sudo rm -rf /etc/rancher/k3s /var/lib/rancher/k3s || true
 
-            sudo mkdir -p /etc/rancher/k3s
-            cat <<-'EOF' | sudo tee /etc/rancher/k3s/config.yaml >/dev/null
-            write-kubeconfig-mode: "0644"
-            disable:
-              - traefik
-              - metrics-server
-            node-ip: "${PRIVATE_IP}"
-            advertise-address: "${PRIVATE_IP}"
-            flannel-iface: "${PRIMARY_IFACE}"
-            tls-san:
-              - "127.0.0.1"
-              - "${PRIVATE_IP}"
-            EOF 
-
             # скачиваем, но стартует systemd, уже с нашим config.yaml
             curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s -
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now k3s
-          else
-            # k3s уже есть — приводим конфиг к нужному виду и перезапускаем
-            sudo mkdir -p /etc/rancher/k3s
-          cat <<-'EOF' | sudo tee /etc/rancher/k3s/config.yaml >/dev/null
-            write-kubeconfig-mode: "0644"
-            disable:
-              - traefik
-              - metrics-server
-            node-ip: "${PRIVATE_IP}"
-            advertise-address: "${PRIVATE_IP}"
-            flannel-iface: "${PRIMARY_IFACE}"
-            tls-san:
-              - "127.0.0.1"
-              - "${PRIVATE_IP}"
-          EOF 
-            sudo systemctl daemon-reload
-            sudo systemctl restart k3s
           fi
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now k3s
 
           # 4. kubeconfig для runner'а
           install -d -m 755 "$HOME/.kube"
