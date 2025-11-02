@@ -162,12 +162,26 @@ jobs:
       - name: Associate Elastic IP to this EC2 (idempotent)
         env:
           EIP_ALLOCATION_ID: ${{ vars.EIP_ALLOCATION_ID }}
-        shell: bash
         run: |
           set -euo pipefail
-          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-          aws ec2 associate-address --allocation-id "$EIP_ALLOCATION_ID" --instance-id "$INSTANCE_ID" --region "$AWS_REGION" >/dev/null 2>&1 || true
+
+          for i in {1..5}; do
+            echo "associate attempt $i..."
+            if aws ec2 associate-address \
+              --allocation-id "$EIP_ALLOCATION_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$AWS_REGION" \
+              --cli-connect-timeout 5 \
+              --cli-read-timeout 5; then
+              echo "ok"
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "WARN: EIP not associated"
 
       - name: Open SG inbound 80/tcp (idempotent)
         env:
