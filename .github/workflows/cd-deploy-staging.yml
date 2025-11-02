@@ -271,7 +271,7 @@ jobs:
             --set image.repository=${{ inputs.repo_path }} \
             --set image.digest=${{ inputs.digest }} \
             --set image.pullSecrets[0]=ecr-pull \
-            --set-string api.version="$API_VERSION" \
+            --set-string api.version=${{ env.API_VERSION }} \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
       - name: Wait rollout
