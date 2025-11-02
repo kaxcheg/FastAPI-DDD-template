@@ -73,7 +73,7 @@ jobs:
             sudo rm -rf /etc/rancher/k3s /var/lib/rancher/k3s || true
 
             sudo mkdir -p /etc/rancher/k3s
-          cat <<-'EOF' | sudo tee /etc/rancher/k3s/config.yaml >/dev/null
+            cat <<-'EOF' | sudo tee /etc/rancher/k3s/config.yaml >/dev/null
             write-kubeconfig-mode: "0644"
             disable:
               - traefik
@@ -84,7 +84,7 @@ jobs:
             tls-san:
               - "127.0.0.1"
               - "${PRIVATE_IP}"
-          EOF 
+            EOF 
 
             # скачиваем, но стартует systemd, уже с нашим config.yaml
             curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s -
