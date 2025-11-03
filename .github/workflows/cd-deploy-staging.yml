@@ -312,10 +312,10 @@ jobs:
             -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
           if [ -n "${db_wl:-}" ]; then
             echo "rollout: $db_wl"
-            kubectl -n "$ns" rollout status "$db_wl" --timeout=5m
+            kubectl -n "$ns" rollout status "$db_wl" --timeout=1m
             kubectl -n "$ns" wait pod \
               -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
-              --for=condition=Ready --timeout=5m
+              --for=condition=Ready --timeout=1m
           else
             echo "No DB Deployment/StatefulSet found by selector."
             kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
@@ -325,7 +325,7 @@ jobs:
           # --- DB bootstrap job (если включено) ---
           echo "::group::DB bootstrap job"
           if kubectl -n "$ns" get job "${rel}-db-bootstrap" >/dev/null 2>&1; then
-            kubectl -n "$ns" wait job/"${rel}-db-bootstrap" --for=condition=complete --timeout=5m || {
+            kubectl -n "$ns" wait job/"${rel}-db-bootstrap" --for=condition=complete --timeout=1m || {
               echo "db-bootstrap job did not complete; recent logs:"
               kubectl -n "$ns" logs job/"${rel}-db-bootstrap" --tail=200 || true
               exit 1
@@ -343,10 +343,10 @@ jobs:
             -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
           if [ -n "${api_wl:-}" ]; then
             echo "rollout: $api_wl"
-            kubectl -n "$ns" rollout status "$api_wl" --timeout=5m
+            kubectl -n "$ns" rollout status "$api_wl" --timeout=1m
             kubectl -n "$ns" wait pod \
               -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
-              --for=condition=Ready --timeout=5m
+              --for=condition=Ready --timeout=1m
           else
             echo "No API Deployment/StatefulSet found by selector."
             kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
