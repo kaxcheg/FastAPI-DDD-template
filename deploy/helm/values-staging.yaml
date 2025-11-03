@@ -1,14 +1,22 @@
+image:
+  repository: ""
+  tag: ""
+  digest: ""
+
+config:
+  enabled: true
+  data:
+    ENV: "test"
+    DEBUG: "false"
+    DB_USER: "staging_db_user"
+    DB_PATH: "staging_db"
+
 api:
   replicas: 1
   service:
     type: LoadBalancer
     port: 80
   containerPort: 8000
-  env:
-    ENV: "test"
-    DEBUG: "false"
-    DB_USER: "staging_db_user"
-    DB_PATH: "staging_db"
 
 db:
   persistence:
