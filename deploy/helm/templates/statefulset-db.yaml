@@ -62,10 +62,17 @@ spec:
             items:
               - { key: DB_ADMIN_SECRET, path: {{ .Values.db.adminSecretPath }} }
   volumeClaimTemplates:
-    - metadata: { name: pgdata }
+    - metadata:
+        name: pgdata
+        labels:
+          app.kubernetes.io/name: {{ include "dddapitpl.name" . }}
+          app.kubernetes.io/instance: {{ .Release.Name }}
+          app.kubernetes.io/component: "db"
       spec:
         accessModes: ["ReadWriteOnce"]
-        resources: { requests: { storage: {{ .Values.db.persistence.size }} } }
+        resources:
+          requests:
+            storage: {{ .Values.db.persistence.size }}
         {{- if .Values.db.persistence.storageClassName }}
         storageClassName: {{ .Values.db.persistence.storageClassName }}
         {{- end }}

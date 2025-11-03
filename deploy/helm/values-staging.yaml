@@ -22,7 +22,7 @@ db:
   persistence:
     enabled: true
     size: 1Gi
-    storageClass: local-path
+    storageClassName: local-path
 
 image:
   # repository/digest set by workflow
