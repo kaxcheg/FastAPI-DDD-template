@@ -8,7 +8,6 @@ config:
   data:
     ENV: "test"
     DEBUG: "false"
-
     DB_USER: "ci_db_user"
     DB_PATH: "ci_db"
 
