@@ -5,6 +5,7 @@ metadata:
   name: {{ include "dddapitpl.db-name" . }}
   labels:
     {{- include "dddapitpl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "db"
 spec:
   serviceName: {{ include "dddapitpl.db-name" . }}
   replicas: 1
