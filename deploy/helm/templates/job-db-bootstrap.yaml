@@ -44,7 +44,12 @@ spec:
         - name: db-bootstrap
           image: "{{ .Values.dbBootstrap.image.repository }}:{{ .Values.dbBootstrap.image.tag }}"
           imagePullPolicy: {{ .Values.dbBootstrap.image.pullPolicy }}
-          command: ["/bin/bash","-lc","bash /bootstrap/bootstrap_db.sh"]
+          command: ["/bin/bash","-lc"]
+              args:
+                - |
+                  set -Eeuxo pipefail
+                  echo "[env] DB_HOST=${DB_HOST:-<empty>} DB_ADMIN=${DB_ADMIN:-<empty>} DB_USER=${DB_USER:-<empty>} DB_PATH=${DB_PATH:-<empty>} SCHEMA=${DB_TABLE_SCHEMA:-<empty>}"
+                  bash /bootstrap/bootstrap_db.sh || { echo "[bootstrap] FAILED, sleeping for inspect"; sleep 3600; exit 1; }
           env:
           {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.dbBootstrap.envFromConfigKeys }}
