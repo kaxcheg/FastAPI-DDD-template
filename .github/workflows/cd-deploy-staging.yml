@@ -299,7 +299,9 @@ jobs:
           # (опционально) мягко подождём PVC релиза, если есть
           echo "::group::PVC"
           for pvc in $(kubectl -n "$ns" get pvc -l app.kubernetes.io/instance="$rel" -o name 2>/dev/null || true); do
-            kubectl -n "$ns" wait "$pvc" --for=condition=Bound --timeout=2m || true
+            kubectl -n "$ns" wait "$pvc" \
+              --for=jsonpath='{.status.phase}'=Bound \
+              --timeout=2m || true
           done
           echo "::endgroup::"
 

@@ -1,10 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dddapitpl.fullname" . }}-db
+  name: {{ include "dddapitpl.db-name" . }}   # dddapitpl-db
   labels:
     {{- include "dddapitpl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "db"
 spec:
+  clusterIP: None  # headless — нужен StatefulSet-у для стабильного DNS
   selector:
     {{- $ctx := dict "component" "db" | merge (dict) -}}
     {{- $_ := set $ctx "Chart" .Chart -}}
@@ -13,4 +15,6 @@ spec:
     {{- $_ := set $ctx "Capabilities" .Capabilities -}}
     {{- include "dddapitpl.selectorLabels" $ctx | nindent 4 }}
   ports:
-    - { name: psql, port: {{ .Values.db.port }}, targetPort: {{ .Values.db.port }} }
+    - name: psql
+      port: {{ .Values.db.port }}
+      targetPort: {{ .Values.db.port }}

@@ -22,6 +22,7 @@ spec:
         {{- include "dddapitpl.labels" . | nindent 8 }}
         app.kubernetes.io/component: "db"
     spec:
+      serviceAccountName: {{ include "dddapitpl.db-name" . }}
       automountServiceAccountToken: false 
       containers:
         - name: db
