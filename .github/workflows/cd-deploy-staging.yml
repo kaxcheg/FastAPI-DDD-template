@@ -292,29 +292,64 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "⏳ Waiting for DB Deployment..."
-          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-db --timeout=180s
-          kubectl -n "$NAMESPACE" wait pod \
-            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db \
-            --for=condition=Ready --timeout=180s || true
 
-          echo "⏳ Waiting for API Deployment..."
-          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-api --timeout=180s
-          kubectl -n "$NAMESPACE" wait pod \
-            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api \
-            --for=condition=Ready --timeout=180s || true
+          ns="$NAMESPACE"
+          rel="$RELEASE"
 
-          echo "⏳ Waiting for DB Bootstrap Job (if any)..."
-          for i in {1..60}; do
-            if kubectl -n "$NAMESPACE" get jobs.batch "$RELEASE"-db-bootstrap >/dev/null 2>&1; then
-              if kubectl -n "$NAMESPACE" wait --for=condition=complete --timeout=120s job/"$RELEASE"-db-bootstrap; then
-                break
-              fi
-            else
-              break
-            fi
-            sleep 2
+          # (опционально) мягко подождём PVC релиза, если есть
+          echo "::group::PVC"
+          for pvc in $(kubectl -n "$ns" get pvc -l app.kubernetes.io/instance="$rel" -o name 2>/dev/null || true); do
+            kubectl -n "$ns" wait "$pvc" --for=condition=Bound --timeout=2m || true
           done
+          echo "::endgroup::"
+
+          # --- DB workload (Deployment или StatefulSet) ---
+          echo "::group::Wait DB"
+          db_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
+            -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
+            -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
+          if [ -n "${db_wl:-}" ]; then
+            echo "rollout: $db_wl"
+            kubectl -n "$ns" rollout status "$db_wl" --timeout=5m
+            kubectl -n "$ns" wait pod \
+              -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
+              --for=condition=Ready --timeout=5m
+          else
+            echo "No DB Deployment/StatefulSet found by selector."
+            kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
+          fi
+          echo "::endgroup::"
+
+          # --- DB bootstrap job (если включено) ---
+          echo "::group::DB bootstrap job"
+          if kubectl -n "$ns" get job "${rel}-db-bootstrap" >/dev/null 2>&1; then
+            kubectl -n "$ns" wait job/"${rel}-db-bootstrap" --for=condition=complete --timeout=5m || {
+              echo "db-bootstrap job did not complete; recent logs:"
+              kubectl -n "$ns" logs job/"${rel}-db-bootstrap" --tail=200 || true
+              exit 1
+            }
+            kubectl -n "$ns" logs job/"${rel}-db-bootstrap" --tail=200 || true
+          else
+            echo "no db-bootstrap job"
+          fi
+          echo "::endgroup::"
+
+          # --- API workload (Deployment или StatefulSet) ---
+          echo "::group::Wait API"
+          api_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
+            -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
+            -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
+          if [ -n "${api_wl:-}" ]; then
+            echo "rollout: $api_wl"
+            kubectl -n "$ns" rollout status "$api_wl" --timeout=5m
+            kubectl -n "$ns" wait pod \
+              -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
+              --for=condition=Ready --timeout=5m
+          else
+            echo "No API Deployment/StatefulSet found by selector."
+            kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
+          fi
+          echo "::endgroup::"
 
       - name: Integration tests
         run: |
