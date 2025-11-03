@@ -27,7 +27,6 @@ spec:
           image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
           imagePullPolicy: {{ .Values.db.image.pullPolicy }}
           ports: [{ name: psql, containerPort: {{ .Values.db.port }} }]
-
           env:
           {{- $cfgName := (include "dddapitpl.fullname" .) | printf "%s-config" -}}
           {{- range $k := .Values.db.envFromConfigKeys }}
