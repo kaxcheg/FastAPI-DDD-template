@@ -278,13 +278,15 @@ jobs:
           helm repo update
           helm upgrade --install aws-for-fluent-bit aws-observability/aws-for-fluent-bit \
             --namespace kube-system \
-            --set cloudWatch.region="$AWS_REGION" \
-            --set cloudWatch.logGroupName="$LOG_GROUP" \
-            --set cloudWatch.logStreamPrefix="$RELEASE" \
-            --set cloudWatch.autoCreateGroup=true \
-            --set image.repository="public.ecr.aws/aws-observability/aws-for-fluent-bit" \
-            --set resources.limits.cpu=200m \
-            --set resources.limits.memory=200Mi
+            --set rbac.create=true \
+            --set serviceAccount.create=true \
+            --set hostNetwork=true \
+            --set dnsPolicy=ClusterFirstWithHostNet \
+            --set cloudWatchLogs.enabled=true \
+            --set cloudWatchLogs.region="$AWS_REGION" \
+            --set-string cloudWatchLogs.logGroupName="$LOG_GROUP" \
+            --set cloudWatchLogs.logStreamPrefix="$RELEASE" \
+            --set cloudWatchLogs.autoCreateGroup=true
 
       - name: Optional reset DB (uninstall & delete PVC)
         if: ${{ inputs.reset_db == 'true' }}
