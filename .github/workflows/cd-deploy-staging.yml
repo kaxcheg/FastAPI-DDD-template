@@ -214,6 +214,21 @@ jobs:
           sudo journalctl -u k3s --no-pager -n 200 || true
           exit 1
 
+      - name: Ensure IMDSv2 hop limit for pods (set to 2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+          # Применим hop-limit=2 и требуем IMDSv2 токены (idempotent)
+          aws ec2 modify-instance-metadata-options \
+            --instance-id "$INSTANCE_ID" \
+            --region "$AWS_REGION" \
+            --http-tokens required \
+            --http-endpoint enabled \
+            --http-put-response-hop-limit 2
+
       - name: Pull secrets from AWS Secrets Manager → K8s Secret (with retries)
         shell: bash
         env:
@@ -265,7 +280,11 @@ jobs:
             --namespace kube-system \
             --set cloudWatch.region="$AWS_REGION" \
             --set cloudWatch.logGroupName="$LOG_GROUP" \
-            --set cloudWatch.logStreamPrefix="app"
+            --set cloudWatch.logStreamPrefix="$RELEASE" \
+            --set cloudWatch.autoCreateGroup=true \
+            --set image.repository="public.ecr.aws/aws-observability/aws-for-fluent-bit" \
+            --set resources.limits.cpu=200m \
+            --set resources.limits.memory=200Mi
 
       - name: Optional reset DB (uninstall & delete PVC)
         if: ${{ inputs.reset_db == 'true' }}
@@ -296,7 +315,6 @@ jobs:
           ns="$NAMESPACE"
           rel="$RELEASE"
 
-          # (опционально) мягко подождём PVC релиза, если есть
           echo "::group::PVC"
           for pvc in $(kubectl -n "$ns" get pvc -l app.kubernetes.io/instance="$rel" -o name 2>/dev/null || true); do
             kubectl -n "$ns" wait "$pvc" \
