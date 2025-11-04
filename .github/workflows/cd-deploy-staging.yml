@@ -6,7 +6,7 @@ on:
       digest: {type: string, required: true}
       repo_path: {type: string, required: true}
       registry: {type: string, required: true}
-      reset_db: {type: string, required: false, default: "false"}
+      reset_db: {type: string, required: false, default: "true"}
 
 concurrency:
   group: deploy-staging-${{ github.repository }}
@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           helm uninstall "$RELEASE" --namespace "$NAMESPACE" || true
-          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/component=db || true
+          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/instance="$RELEASE" || true
 
       - name: Helm upgrade (staging)
         shell: bash
@@ -391,17 +391,6 @@ jobs:
           fi
           echo "::endgroup::"
 
-          # --- API pod (1 шт) ---
-          echo "::group::API pod logs"
-          api_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
-          if [ -n "${api_pod:-}" ]; then
-            kubectl -n "$ns" logs "$api_pod" --tail=200 --request-timeout="$KUBECTL_TIMEOUT" || true
-            kubectl -n "$ns" describe "$api_pod" | tail -n 200 || true
-          else
-            echo "no api pod"
-          fi
-          echo "::endgroup::"
-
           # --- DB bootstrap job (если есть) ---
           echo "::group::DB bootstrap job"
           if kubectl -n "$ns" get job "$rel"-db-bootstrap --request-timeout="$KUBECTL_TIMEOUT" >/dev/null 2>&1; then
@@ -412,6 +401,17 @@ jobs:
             fi
           else
             echo "no db-bootstrap job"
+          fi
+          echo "::endgroup::"
+
+          # --- API pod (1 шт) ---
+          echo "::group::API pod logs"
+          api_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
+          if [ -n "${api_pod:-}" ]; then
+            kubectl -n "$ns" logs "$api_pod" --tail=200 --request-timeout="$KUBECTL_TIMEOUT" || true
+            kubectl -n "$ns" describe "$api_pod" | tail -n 200 || true
+          else
+            echo "no api pod"
           fi
           echo "::endgroup::"
 
