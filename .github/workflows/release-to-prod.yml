@@ -1,21 +1,12 @@
-name: Release to prod
+name: Promote staging image to PROD & deploy
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
-    inputs:
-        digest:
-          description: "Image digest (sha256:...)"
-          required: true
-        registry:
-          default: "054051494246.dkr.ecr.eu-north-1.amazonaws.com"
-          required: true
-        repo_path:
-          default: "$054051494246.dkr.ecr.eu-north-1.amazonaws.com/prod/fastapi-ddd-template"
-          required: true
+    tags:
+      - 'release/*'
+      - 'v*'
+  workflow_dispatch: {}
 
-        
 concurrency:
   group: deploy-prod-${{ github.repository }}
   cancel-in-progress: true
@@ -25,11 +16,131 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  AWS_REGION:         ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY:     ${{ vars.ECR_REPOSITORY }}
+
 jobs:
+  promote_and_deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      digest:   ${{ steps.out.outputs.digest }}
+      registry: ${{ steps.out.outputs.registry }}
+      repo_path: ${{ steps.out.outputs.repo_path }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+        
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute registry
+        id: repo
+        shell: bash
+        run: |
+          echo "REGISTRY=${{ steps.ecr.outputs.registry }}" >> $GITHUB_ENV
+
+      - name: Compute SRC/DST repo paths (match CI formula)
+        id: paths
+        run: |
+          SRC_REPO_PATH="staging/${ECR_REPOSITORY}"
+          DST_REPO_PATH="prod/${ECR_REPOSITORY}"
+          echo "src_repo_path=$SRC_REPO_PATH" >> "$GITHUB_OUTPUT"
+          echo "dst_repo_path=$DST_REPO_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve digest in STAGING by CI tag
+        id: digest_src
+        env:
+          SRC_REPO_PATH: ${{ steps.paths.outputs.src_repo_path }}
+        run: |
+          SRC_TAG="staging-${GITHUB_SHA}"
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "$SRC_REPO_PATH" \
+            --image-ids imageTag="$SRC_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "None" ]; then
+            echo "No image with tag $SRC_TAG in $SRC_REPO_PATH" >&2
+            exit 1
+          fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch image manifest from STAGING
+        id: manifest
+        env:
+          SRC_REPO_PATH: ${{ steps.paths.outputs.src_repo_path }}
+        run: |
+          MANIFEST_JSON=$(aws ecr batch-get-image \
+            --repository-name "$SRC_REPO_PATH" \
+            --image-ids imageDigest="${{ steps.digest_src.outputs.digest }}" \
+            --accepted-media-types \
+              application/vnd.docker.distribution.manifest.v2+json \
+              application/vnd.docker.distribution.manifest.list.v2+json \
+            --query 'images[0].imageManifest' --output text)
+
+          MEDIA_TYPE=$(aws ecr batch-get-image \
+            --repository-name "$SRC_REPO_PATH" \
+            --image-ids imageDigest="${{ steps.digest_src.outputs.digest }}" \
+            --accepted-media-types \
+              application/vnd.docker.distribution.manifest.v2+json \
+              application/vnd.docker.distribution.manifest.list.v2+json \
+            --query 'images[0].imageManifestMediaType' --output text)
+
+          if [ -z "$MANIFEST_JSON" ] || [ "$MANIFEST_JSON" = "None" ]; then
+            echo "Cannot fetch manifest for ${{ steps.digest_src.outputs.digest }}" >&2
+            exit 1
+          fi
+
+          echo "media_type=$MEDIA_TYPE"   >> "$GITHUB_OUTPUT"
+          echo "manifest<<EOF"            >> "$GITHUB_OUTPUT"
+          echo "$MANIFEST_JSON"           >> "$GITHUB_OUTPUT"
+          echo "EOF"                      >> "$GITHUB_OUTPUT"
+
+      - name: Put image into PROD with release tag
+        id: put_prod
+        env:
+          DST_REPO_PATH: ${{ steps.paths.outputs.dst_repo_path }}
+        run: |
+          aws ecr put-image \
+            --repository-name "$DST_REPO_PATH" \
+            --image-tag "${GITHUB_REF_NAME}" \
+            --image-manifest "${{ steps.manifest.outputs.manifest }}" \
+            ${MEDIA:+--image-manifest-media-type "$MEDIA"}
+        env:
+          MEDIA: ${{ steps.manifest.outputs.media_type }}
+
+      - name: Resolve PROD digest by release tag
+        id: digest_prod
+        env:
+          DST_REPO_PATH: ${{ steps.paths.outputs.dst_repo_path }}
+        run: |
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "$DST_REPO_PATH" \
+            --image-ids imageTag="${GITHUB_REF_NAME}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "None" ]; then
+            echo "Failed to resolve PROD digest for ${GITHUB_REF_NAME} in ${DST_REPO_PATH}" >&2
+            exit 1
+          fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Consolidate outputs for deploy
+        id: out
+        run: |
+          echo "digest=${{ steps.digest_prod.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          echo "registry=${REGISTRY}"                           >> "$GITHUB_OUTPUT"
+          echo "repo_path=${{ steps.paths.outputs.dst_repo_path }}" >> "$GITHUB_OUTPUT"
+
   deploy_prod:
+    needs: [promote_and_deploy]
     uses: ./.github/workflows/cd-deploy-prod.yml
     secrets: inherit
     with:
-      digest: ${{ workflow_dispatch.inputs.digest }}
-      repo_path: ${{ workflow_dispatch.inputs.repo_path }}
-      registry: ${{ workflow_dispatch.inputs.registry }}
+      digest:   ${{ needs.promote_and_deploy.outputs.digest }}
+      registry: ${{ needs.promote_and_deploy.outputs.registry }}
+      repo_path: ${{ needs.promote_and_deploy.outputs.repo_path }}
