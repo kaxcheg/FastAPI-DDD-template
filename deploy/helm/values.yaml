@@ -61,6 +61,7 @@ api:
     DB_USER_SECRET_PATH: db_user_secret
 
 db:
+  enabled: true
   image: { repository: postgres, tag: "16", pullPolicy: IfNotPresent }
   port: 5432
   persistence:

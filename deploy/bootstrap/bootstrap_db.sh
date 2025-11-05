@@ -16,6 +16,10 @@ DB_USER_PWD_FILE="${DB_USER_PWD_FILE:-/run/secrets/db_user_secret}"
 DB_PORT="${DB_PORT:-5432}"
 DB_TABLE_SCHEMA="${DB_TABLE_SCHEMA:-dddapitpl}"
 EXTENSIONS="${DB_EXTENSIONS:-}"  # e.g. "pgcrypto,uuid-ossp"
+PGSSLMODE="${PGSSLMODE:-prefer}"              # for RDS you may want "require"
+PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-10}"  # seconds
+
+export PGSSLMODE PGCONNECT_TIMEOUT
 
 # --- Read secrets from files if present ---
 read_secret() {
@@ -23,7 +27,12 @@ read_secret() {
   [[ -f "$f" ]] && tr -d '\r' < "$f" | sed -e 's/[[:space:]]*$//'
 }
 
-export PGPASSWORD="$(read_secret "$DB_ADMIN_PWD_FILE" || echo '')" # for psql, createdb, pg_isready
+# Prefer already exported PGPASSWORD; otherwise read from file:
+if [[ -z "${PGPASSWORD:-}" ]]; then
+  PGPASSWORD="$(read_secret "$DB_ADMIN_PWD_FILE" || true)"
+  : "${PGPASSWORD:?admin password missing (PGPASSWORD or $DB_ADMIN_PWD_FILE)}"
+  export PGPASSWORD
+fi
 
 # --- Wait for server readiness ---
 echo "[bootstrap] waiting for ${DB_HOST}:${DB_PORT} ..."
@@ -31,27 +40,35 @@ until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" >/dev/null 2>&1; do
   sleep 1
 done
 
+
 # --- Ensure role exists (with optional password) ---
 role_exists=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -Atc \
   "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER'")
+
+if [[ -z "${DB_USER_SECRET:-}" ]]; then
+  DB_USER_SECRET="$(read_secret "$DB_USER_PWD_FILE")"
+fi
+
 if [[ "$role_exists" != "1" ]]; then
   echo "[bootstrap] creating role $DB_USER"
-  if [[ -f "$DB_USER_PWD_FILE" ]]; then
-    USER_PWD="$(read_secret "$DB_USER_PWD_FILE")"
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
-      "CREATE ROLE \"$DB_USER\" LOGIN PASSWORD '$(printf "%s" "$USER_PWD" | sed "s/'/''/g")';"
-  else
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
-      "CREATE ROLE \"$DB_USER\" LOGIN;"
-  fi
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
+    "CREATE ROLE \"$DB_USER\" LOGIN PASSWORD '$(printf "%s" "$DB_USER_SECRET" | sed "s/'/''/g")';"
 else
   echo "[bootstrap] role $DB_USER already exists"
-  if [[ -f "$DB_USER_PWD_FILE" ]]; then
-    USER_PWD="$(read_secret "$DB_USER_PWD_FILE")"
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -v user="$DB_USER" -v pwd="$USER_PWD" <<SQL
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -v user="$DB_USER" -v pwd="$DB_USER_SECRET" <<SQL
 ALTER ROLE :"user" PASSWORD :'pwd';
 SQL
-  fi
+
+fi
+
+# --- Ensure $DB_PATH exists (RDS: CREATE DATABASE is allowed for rds_master) ---
+db_exists=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -Atc \
+  "SELECT 1 FROM pg_database WHERE datname = '$DB_PATH'")
+if [[ "$db_exists" != "1" ]]; then
+  echo "[bootstrap] creating database $DB_PATH (owner: $DB_USER)"
+  createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -O "$DB_USER" "$DB_PATH"
+else
+  echo "[bootstrap] database $DB_PATH already exists"
 fi
 
 # --- Ensure schema exists ---
@@ -94,16 +111,6 @@ WHERE to_regclass(format('%I.%I', :'ver_schema', 'alembic_version')) IS NOT NULL
 \gexec
 
 PSQL
-
-# --- Ensure $DB_PATH exists ---
-db_exists=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -Atc \
-  "SELECT 1 FROM pg_database WHERE datname = '$DB_PATH'")
-if [[ "$db_exists" != "1" ]]; then
-  echo "[bootstrap] creating database $DB_PATH (owner: $DB_USER)"
-  createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -O "$DB_USER" "$DB_PATH"
-else
-  echo "[bootstrap] database $DB_PATH already exists"
-fi
 
 # --- Idempotent ensure priviliges for $DB_PATH ---
 current_owner=$(psql -h "$DB_HOST" -p $DB_PORT -U "$DB_ADMIN" -d postgres -Atc \

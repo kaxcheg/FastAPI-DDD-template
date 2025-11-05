@@ -7,18 +7,13 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: deploy-staging-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
   actions: read
   contents: read
   id-token: write
-
-env:
-  NAMESPACE: staging
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
   build_and_push:

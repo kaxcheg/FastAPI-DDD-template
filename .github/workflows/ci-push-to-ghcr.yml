@@ -1,13 +1,10 @@
 name: CI build & push to GHCR
 
 on:
-  # push:
-  #   branches:
-  #     - 'release/**'
   workflow_dispatch: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: deploy-staging-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:

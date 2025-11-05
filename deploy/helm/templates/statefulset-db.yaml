@@ -1,4 +1,4 @@
-{{- if .Values.db.persistence.enabled }}
+{{- if and .Values.db.enabled .Values.db.persistence.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

@@ -1,0 +1,35 @@
+name: Release to prod
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+        digest:
+          description: "Image digest (sha256:...)"
+          required: true
+        registry:
+          default: "054051494246.dkr.ecr.eu-north-1.amazonaws.com"
+          required: true
+        repo_path:
+          default: "$054051494246.dkr.ecr.eu-north-1.amazonaws.com/prod/fastapi-ddd-template"
+          required: true
+
+        
+concurrency:
+  group: deploy-prod-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  deploy_prod:
+    uses: ./.github/workflows/cd-deploy-prod.yml
+    secrets: inherit
+    with:
+      digest: ${{ workflow_dispatch.inputs.digest }}
+      repo_path: ${{ workflow_dispatch.inputs.repo_path }}
+      registry: ${{ workflow_dispatch.inputs.registry }}
