@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy-staging-${{ github.repository }}
+  group: release-staging-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:

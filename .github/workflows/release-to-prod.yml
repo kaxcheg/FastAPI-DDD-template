@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy-prod-${{ github.repository }}
+  group: release-prod-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
