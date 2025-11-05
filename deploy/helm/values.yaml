@@ -18,6 +18,7 @@ config:
     DB_ADMIN: "postgres"
     DB_USER: ""
     DB_PATH: ""
+    DB_HOST: ""
     DB_DRIVER: "postgresql+asyncpg"
     DB_TABLE_SCHEMA: "dddapitpl"
     BOOTSTRAP_FLAG: "true"

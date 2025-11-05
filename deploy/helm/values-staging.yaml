@@ -2,6 +2,8 @@ image:
   repository: ""
   tag: ""
   digest: ""
+  pullSecrets: []
+
 
 config:
   enabled: true
@@ -23,7 +25,3 @@ db:
     enabled: true
     size: 1Gi
     storageClassName: local-path
-
-image:
-  # repository/digest set by workflow
-  pullSecrets: []
