@@ -4,10 +4,10 @@ kind: ConfigMap
 metadata:
   name: {{ include "dddapitpl.fullname" . }}-config
 data:
-  DB_HOST: {{ include "dddapitpl.db-name" . }}
-  {{- range $k, $v := .Values.config.data }}
-  {{- if ne $k "DB_HOST" }}
+  DB_HOST: {{ include "dddapitpl.db-name" . | quote }}
+  {{ range $k, $v := .Values.config.data }}
+  {{- if ne $k "DB_HOST" -}}
   {{ $k }}: {{ $v | quote }}
-  {{- end }}
-  {{- end }}
+  {{- end -}}
+  {{ end }}
 {{- end }}
