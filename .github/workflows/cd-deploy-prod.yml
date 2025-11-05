@@ -1,0 +1,445 @@
+name: CD deploy to prod (AWS / k3s)
+
+on:
+  workflow_call:
+    inputs:
+      digest: {type: string, required: true}
+      repo_path: {type: string, required: true}
+      registry: {type: string, required: true}
+      reset_db: {type: string, required: false, default: "true"}
+
+concurrency:
+  group: deploy-prod-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+env:
+  RELEASE: dddapitpl
+  NAMESPACE: prod
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  LOG_GROUP: "/k3s/prod/dddapitpl"
+
+jobs:
+  deploy-prod:
+    runs-on: [self-hosted, ec2, prod]
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive API_VERSION
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [[ "$REF_NAME" == release/* ]]; then
+            echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
+          else
+            echo "API_VERSION=no_version"
+          fi
+
+      - name: Ensure k3s installed (idempotent) + kubeconfig for runner user
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 0. kernel / sysctl preflight (как в ручной последовательности)
+          sudo modprobe overlay || true
+          sudo modprobe br_netfilter || true
+          sudo tee /etc/sysctl.d/99-k3s.conf >/dev/null <<'EOF'
+          net.ipv4.ip_forward=1
+          net.bridge.bridge-nf-call-iptables=1
+          net.bridge.bridge-nf-call-ip6tables=1
+          EOF
+          sudo sysctl --system || true
+
+          # 1. динамически определяем основной интерфейс — НЕ eth0
+          PRIMARY_IFACE=$(ip route get 1.1.1.1 | awk '/dev/ {for (i=1;i<=NF;i++) if ($i=="dev") {print $(i+1); exit}}')
+          if [[ -z "$PRIMARY_IFACE" ]]; then
+            echo "Cannot detect primary interface" >&2
+            exit 1
+          fi
+
+          # 2. берём приватный IP из IMDS
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+
+          sudo mkdir -p /etc/rancher/k3s
+          sudo tee /etc/rancher/k3s/config.yaml >/dev/null << EOF
+          write-kubeconfig-mode: "0644"
+          disable:
+            - traefik
+            - metrics-server
+          node-ip: "${PRIVATE_IP}"
+          advertise-address: "${PRIVATE_IP}"
+          flannel-iface: "${PRIMARY_IFACE}"
+          tls-san:
+            - "127.0.0.1"
+            - "${PRIVATE_IP}"
+          EOF
+
+
+          # 3. если k3s не запущен — ставим «чисто», как вручную
+          if ! systemctl is-active --quiet k3s; then
+            if [ -x /usr/local/bin/k3s-killall.sh ]; then sudo /usr/local/bin/k3s-killall.sh || true; fi
+            if [ -x /usr/local/bin/k3s-uninstall.sh ]; then sudo /usr/local/bin/k3s-uninstall.sh || true; fi
+            sudo rm -rf /etc/rancher/k3s /var/lib/rancher/k3s || true
+
+            # скачиваем, но стартует systemd, уже с нашим config.yaml
+            curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s -
+          fi
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now k3s
+
+          # 4. kubeconfig для runner'а
+          install -d -m 755 "$HOME/.kube"
+          sudo install -m 600 -o "$(id -u)" -g "$(id -g)" /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+
+      - name: Ensure kubectl & helm available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v kubectl >/dev/null 2>&1; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          fi
+          if ! command -v helm >/dev/null 2>&1; then
+            curl -L https://get.helm.sh/helm-v3.15.3-linux-amd64.tar.gz -o helm.tar.gz
+            tar -xzf helm.tar.gz && sudo mv linux-amd64/helm /usr/local/bin/helm
+          fi
+
+      - name: Wait for k3s API to be Ready
+        shell: bash
+        env:
+          NO_PROXY: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          export no_proxy="${NO_PROXY}"
+
+          if ! systemctl is-active --quiet k3s; then
+            echo "k3s service is not active" >&2
+            sudo journalctl -u k3s --no-pager -n 200 || true
+            exit 1
+          fi
+
+          for i in {1..60}; do
+            if curl -k --max-time 2 https://127.0.0.1:6443/healthz >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+            if (( i % 10 == 0 )); then
+              echo "--- k3s logs (last 80 lines) ---"
+              sudo journalctl -u k3s --no-pager -n 80 || true
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "Timeout waiting for k3s API" >&2
+              sudo journalctl -u k3s --no-pager -n 200 || true
+              exit 1
+            fi
+          done
+
+          for i in {1..30}; do
+            if kubectl get nodes >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+            if [[ $i -eq 30 ]]; then
+              echo "kubectl cannot talk to API" >&2
+              exit 1
+            fi
+          done
+
+      - name: Ensure namespace exists
+        shell: bash
+        run: |
+          kubectl get ns "$NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$NAMESPACE"
+
+      - name: Associate Elastic IP to this EC2 (idempotent)
+        env:
+          EIP_ALLOCATION_ID: ${{ vars.EIP_ALLOCATION_ID }}
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+          for i in {1..5}; do
+            echo "associate attempt $i..."
+            if aws ec2 associate-address \
+              --allocation-id "$EIP_ALLOCATION_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$AWS_REGION" \
+              --cli-connect-timeout 5 \
+              --cli-read-timeout 5; then
+              echo "ok"
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "WARN: EIP not associated"
+
+      - name: Open SG inbound 80/tcp (idempotent)
+        env:
+          SECURITY_GROUP_ID: ${{ vars.SECURITY_GROUP_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$SECURITY_GROUP_ID" \
+            --protocol tcp --port 80 --cidr 0.0.0.0/0 \
+            --region "$AWS_REGION" || true
+
+      - name: Create/Update ECR imagePullSecret (with retries)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS="$(aws ecr get-login-password --region "$AWS_REGION")"
+          for i in {1..6}; do
+            if kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
+              --docker-server=${{ inputs.registry }} \
+              --docker-username=AWS \
+              --docker-password="$PASS" \
+              --dry-run=client -o yaml | kubectl apply -f -; then
+              exit 0
+            fi
+            echo "kubectl failed to create/update ecr-pull (attempt $i/6), sleeping..." >&2
+            sleep 5
+          done
+          echo "FATAL: cannot create/update ecr-pull secret after retries" >&2
+          sudo journalctl -u k3s --no-pager -n 200 || true
+          exit 1
+
+      - name: Ensure IMDSv2 hop limit for pods (set to 2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+          # Применим hop-limit=2 и требуем IMDSv2 токены (idempotent)
+          aws ec2 modify-instance-metadata-options \
+            --instance-id "$INSTANCE_ID" \
+            --region "$AWS_REGION" \
+            --http-tokens required \
+            --http-endpoint enabled \
+            --http-put-response-hop-limit 2
+
+      - name: Pull secrets from AWS Secrets Manager → K8s Secret (with retries)
+        shell: bash
+        env:
+          SM_DB_ADMIN_SECRET: PROD_DB_ADMIN_SECRET
+          SM_DB_USER_SECRET: PROD_DB_USER_SECRET
+          SM_JWT_SECRET: PROD_JWT_SECRET
+          SM_BOOTSTRAP_HASH: PROD_BOOTSTRAP_ADMIN_PASSWORD_HASH
+        run: |
+          set -euo pipefail
+          get_secret(){ aws secretsmanager get-secret-value --secret-id "$1" --query SecretString --output text --region "$AWS_REGION"; }
+          DB_ADMIN=$(get_secret "$SM_DB_ADMIN_SECRET")
+          DB_USER_S=$(get_secret "$SM_DB_USER_SECRET")
+          JWT_SECRET=$(get_secret "$SM_JWT_SECRET")
+          BOOTSTRAP_HASH=$(get_secret "$SM_BOOTSTRAP_HASH")
+
+          for i in {1..6}; do
+            if kubectl -n "$NAMESPACE" create secret generic dddapitpl-secrets \
+              --from-literal=DB_ADMIN_SECRET="$DB_ADMIN" \
+              --from-literal=DB_USER_SECRET="$DB_USER_S" \
+              --from-literal=JWT_SECRET="$JWT_SECRET" \
+              --from-literal=BOOTSTRAP_ADMIN_PASSWORD_HASH="$BOOTSTRAP_HASH" \
+              --dry-run=client -o yaml | kubectl apply -f -; then
+              exit 0
+            fi
+            echo "kubectl failed to create/update dddapitpl-secrets (attempt $i/6), sleeping..." >&2
+            sleep 5
+          done
+          echo "FATAL: cannot create/update dddapitpl-secrets after retries" >&2
+          sudo journalctl -u k3s --no-pager -n 200 || true
+          exit 1
+
+      - name: Ensure CloudWatch log group & retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region "$AWS_REGION" | jq -e \
+            '.logGroups[] | select(.logGroupName==env.LOG_GROUP)' >/dev/null; then
+            aws logs create-log-group --log-group-name "$LOG_GROUP" --region "$AWS_REGION"
+          fi
+          aws logs put-retention-policy --log-group-name "$LOG_GROUP" --retention-in-days 14 --region "$AWS_REGION" || true
+
+      - name: Install/Update aws-for-fluent-bit (CloudWatch)
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm repo add aws-observability https://aws.github.io/eks-charts
+          helm repo update
+          helm upgrade --install aws-for-fluent-bit aws-observability/aws-for-fluent-bit \
+            --namespace kube-system \
+            --set rbac.create=true \
+            --set serviceAccount.create=true \
+            --set hostNetwork=true \
+            --set dnsPolicy=ClusterFirstWithHostNet \
+            --set cloudWatchLogs.enabled=true \
+            --set cloudWatchLogs.region="$AWS_REGION" \
+            --set-string cloudWatchLogs.logGroupName="$LOG_GROUP" \
+            --set cloudWatchLogs.logStreamPrefix="$RELEASE" \
+            --set cloudWatchLogs.autoCreateGroup=true
+
+      - name: Optional reset DB (uninstall & delete PVC)
+        if: ${{ inputs.reset_db == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm uninstall "$RELEASE" --namespace "$NAMESPACE" || true
+          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/instance="$RELEASE" || true
+
+      - name: Helm upgrade (prod)
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm upgrade --install "$RELEASE" deploy/helm \
+            --namespace "$NAMESPACE" \
+            -f deploy/helm/values-prod.yaml \
+            --set image.repository=${{ inputs.repo_path }} \
+            --set image.digest=${{ inputs.digest }} \
+            --set image.pullSecrets[0]=ecr-pull \
+            --set-string api.version=${{ env.API_VERSION }} \
+            --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
+
+      - name: Wait rollout
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ns="$NAMESPACE"
+          rel="$RELEASE"
+
+          echo "::group::PVC"
+          for pvc in $(kubectl -n "$ns" get pvc -l app.kubernetes.io/instance="$rel" -o name 2>/dev/null || true); do
+            kubectl -n "$ns" wait "$pvc" \
+              --for=jsonpath='{.status.phase}'=Bound \
+              --timeout=2m || true
+          done
+          echo "::endgroup::"
+
+          # --- DB workload (Deployment или StatefulSet) ---
+          echo "::group::Wait DB"
+          db_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
+            -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
+            -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
+          if [ -n "${db_wl:-}" ]; then
+            echo "rollout: $db_wl"
+            kubectl -n "$ns" rollout status "$db_wl" --timeout=1m
+            kubectl -n "$ns" wait pod \
+              -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
+              --for=condition=Ready --timeout=1m
+          else
+            echo "No DB Deployment/StatefulSet found by selector."
+            kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
+          fi
+          echo "::endgroup::"
+
+          # --- DB bootstrap job (если включено) ---
+          echo "::group::DB bootstrap job"
+          if kubectl -n "$ns" get job "${rel}-db-bootstrap" >/dev/null 2>&1; then
+            kubectl -n "$ns" wait job/"${rel}-db-bootstrap" --for=condition=complete --timeout=1m || {
+              echo "db-bootstrap job did not complete; recent logs:"
+              kubectl -n "$ns" logs job/"${rel}-db-bootstrap" --tail=200 || true
+              exit 1
+            }
+            kubectl -n "$ns" logs job/"${rel}-db-bootstrap" --tail=200 || true
+          else
+            echo "no db-bootstrap job"
+          fi
+          echo "::endgroup::"
+
+          # --- API workload (Deployment или StatefulSet) ---
+          echo "::group::Wait API"
+          api_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
+            -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
+            -o name --sort-by=.metadata.creationTimestamp | tail -n1 || true)"
+          if [ -n "${api_wl:-}" ]; then
+            echo "rollout: $api_wl"
+            kubectl -n "$ns" rollout status "$api_wl" --timeout=1m
+            kubectl -n "$ns" wait pod \
+              -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
+              --for=condition=Ready --timeout=1m
+          else
+            echo "No API Deployment/StatefulSet found by selector."
+            kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
+          fi
+          echo "::endgroup::"
+
+      - name: Integration tests
+        run: |
+          make test-int
+      
+      - name: Helm smoke test
+        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
+
+      - name: E2E tests
+        run: |
+          make test-e2e
+
+      - name: Get logs on failure (compact)
+        if: ${{ failure() }}
+        shell: bash
+        env:
+          KUBECTL_TIMEOUT: 10s
+        run: |
+          set -euo pipefail
+
+          ns="$NAMESPACE"
+          rel="$RELEASE"
+
+          echo "::group::Summary"
+          kubectl -n "$ns" get pods -o wide --request-timeout="$KUBECTL_TIMEOUT" || true
+          kubectl -n "$ns" get events --sort-by=.metadata.creationTimestamp | tail -n 100 || true
+          echo "::endgroup::"
+
+          # --- DB pod (1 шт) ---
+          echo "::group::DB pod logs"
+          db_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
+          if [ -n "${db_pod:-}" ]; then
+            kubectl -n "$ns" logs "$db_pod" --tail=200 --request-timeout="$KUBECTL_TIMEOUT" || true
+            kubectl -n "$ns" describe "$db_pod" | tail -n 200 || true
+          else
+            echo "no db pod"
+          fi
+          echo "::endgroup::"
+
+          # --- DB bootstrap job (если есть) ---
+          echo "::group::DB bootstrap job"
+          if kubectl -n "$ns" get job "$rel"-db-bootstrap --request-timeout="$KUBECTL_TIMEOUT" >/dev/null 2>&1; then
+            kubectl -n "$ns" describe job "$rel"-db-bootstrap | tail -n 200 || true
+            boot_pod="$(kubectl -n "$ns" get pods -l job-name="$rel"-db-bootstrap -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
+            if [ -n "${boot_pod:-}" ]; then
+              kubectl -n "$ns" logs "$boot_pod" --tail=200 --request-timeout="$KUBECTL_TIMEOUT" || true
+            fi
+          else
+            echo "no db-bootstrap job"
+          fi
+          echo "::endgroup::"
+
+          # --- API pod (1 шт) ---
+          echo "::group::API pod logs"
+          api_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
+          if [ -n "${api_pod:-}" ]; then
+            kubectl -n "$ns" logs "$api_pod" --tail=200 --request-timeout="$KUBECTL_TIMEOUT" || true
+            kubectl -n "$ns" describe "$api_pod" | tail -n 200 || true
+          else
+            echo "no api pod"
+          fi
+          echo "::endgroup::"
+
+      - name: Show prod endpoint
+        env:
+          EIP_ALLOCATION_ID: ${{ vars.EIP_ALLOCATION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IP=$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOCATION_ID" --region "$AWS_REGION" --query 'Addresses[0].PublicIp' --output text)
+          echo "prod API is expected at: http://$IP/"

@@ -3,6 +3,10 @@ name: CD cleanup staging (uninstall & wipe PVC)
 on:
   workflow_dispatch: {}
 
+concurrency:
+  group: cleanup-staging-dddapitpl-${{ vars.NAMESPACE }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

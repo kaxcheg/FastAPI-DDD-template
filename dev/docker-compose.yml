@@ -35,7 +35,7 @@ services:
       DB_USER: ${DB_USER}
       DB_TABLE_SCHEMA: ${DB_TABLE_SCHEMA}
       DB_USER_SECRET: ${DB_USER_SECRET}
-      DB_ADMIN_SECRET: ${DB_ADMIN_SECRET}
+      PGPASSWORD: ${DB_ADMIN_SECRET}
     volumes:
     - ../deploy/bootstrap:/bootstrap:ro
   api:

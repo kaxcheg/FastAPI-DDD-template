@@ -15,7 +15,7 @@ on:
 
 
 concurrency:
-  group: ecr-push-${{ github.repository }}
+  group: deploy-staging-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:

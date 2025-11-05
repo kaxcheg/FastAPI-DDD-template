@@ -11,7 +11,11 @@
 {{- end -}}
 
 {{- define "dddapitpl.db-name" -}}
+{{- if .Values.config.data.DB_HOST }}
+{{ .Values.config.data.DB_HOST }}
+{{- else }}
 {{ include "dddapitpl.name" . }}-db
+{{- end -}}
 {{- end -}}
 
 {{- define "dddapitpl.api-name" -}}
