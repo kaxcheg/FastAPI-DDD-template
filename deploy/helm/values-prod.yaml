@@ -2,6 +2,7 @@ image:
   repository: ""
   tag: ""
   digest: ""
+  pullSecrets: []
 
 config:
   enabled: true
@@ -21,7 +22,3 @@ api:
 
 db:
   enabled: false
-
-image:
-  # repository/digest set by workflow
-  pullSecrets: []
