@@ -103,15 +103,24 @@ jobs:
       - name: Put image into PROD with release tag
         id: put_prod
         env:
-          DST_REPO_PATH: ${{ steps.paths.outputs.dst_repo_path }}
+          DST_REPO_PATH:   ${{ steps.paths.outputs.dst_repo_path }}
+          MEDIA:           ${{ steps.manifest.outputs.media_type }}
+          MANIFEST_JSON:   ${{ steps.manifest.outputs.manifest }}
         run: |
-          aws ecr put-image \
-            --repository-name "$DST_REPO_PATH" \
-            --image-tag "${GITHUB_REF_NAME}" \
-            --image-manifest "${{ steps.manifest.outputs.manifest }}" \
-            ${MEDIA:+--image-manifest-media-type "$MEDIA"}
-        env:
-          MEDIA: ${{ steps.manifest.outputs.media_type }}
+          set -euo pipefail
+
+          if [[ -n "${MEDIA:-}" && "${MEDIA}" != "None" ]]; then
+            aws ecr put-image \
+              --repository-name "$DST_REPO_PATH" \
+              --image-tag "${GITHUB_REF_NAME}" \
+              --image-manifest "$MANIFEST_JSON" \
+              --image-manifest-media-type "$MEDIA"
+          else
+            aws ecr put-image \
+              --repository-name "$DST_REPO_PATH" \
+              --image-tag "${GITHUB_REF_NAME}" \
+              --image-manifest "$MANIFEST_JSON"
+          fi
 
       - name: Resolve PROD digest by release tag
         id: digest_prod
