@@ -6,7 +6,6 @@ on:
       digest: {type: string, required: true}
       repo_path: {type: string, required: true}
       registry: {type: string, required: true}
-      reset_db: {type: string, required: false, default: "true"}
 
 concurrency:
   group: deploy-prod-${{ github.repository }}
@@ -287,14 +286,6 @@ jobs:
             --set-string cloudWatchLogs.logGroupName="$LOG_GROUP" \
             --set cloudWatchLogs.logStreamPrefix="$RELEASE" \
             --set cloudWatchLogs.autoCreateGroup=true
-
-      - name: Optional reset DB (uninstall & delete PVC)
-        if: ${{ inputs.reset_db == 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          helm uninstall "$RELEASE" --namespace "$NAMESPACE" || true
-          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/instance="$RELEASE" || true
 
       - name: Helm upgrade (prod)
         shell: bash

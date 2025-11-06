@@ -18,6 +18,10 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "dddapitpl.db-meta-name" -}}
+{{- printf "%s-db" (include "dddapitpl.name" .) -}}
+{{- end -}}
+
 
 {{- define "dddapitpl.api-name" -}}
 {{ include "dddapitpl.name" . }}-api
