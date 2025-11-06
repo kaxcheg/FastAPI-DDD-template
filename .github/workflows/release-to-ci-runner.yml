@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy-ci-runner-${{ github.repository }}
+  group: release-ci-runner-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
