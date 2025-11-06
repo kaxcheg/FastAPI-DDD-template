@@ -303,8 +303,7 @@ jobs:
           helm upgrade --install "$RELEASE" deploy/helm \
             --namespace "$NAMESPACE" \
             -f deploy/helm/values-staging.yaml \
-            --set image.registry=${{ inputs.registry }} \
-            --set image.repository=${{ inputs.repo_path }} \
+            --set image.repository=${{ inputs.registry }}/${{ inputs.repo_path }} \
             --set image.digest=${{ inputs.digest }} \
             --set image.pullSecrets[0]=ecr-pull \
             --set-string api.version=${{ env.API_VERSION }} \

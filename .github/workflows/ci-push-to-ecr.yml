@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: |
           REGISTRY="${{ steps.ecr.outputs.registry }}"
-          REPO_PATH="${REGISTRY}/${NAMESPACE}/${ECR_REPOSITORY}"
+          REPO_PATH="${NAMESPACE}/${ECR_REPOSITORY}"
           echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
           echo "repo_path=$REPO_PATH" >> "$GITHUB_OUTPUT"
 
