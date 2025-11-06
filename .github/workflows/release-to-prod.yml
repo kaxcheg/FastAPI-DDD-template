@@ -100,27 +100,35 @@ jobs:
           echo "$MANIFEST_JSON"           >> "$GITHUB_OUTPUT"
           echo "EOF"                      >> "$GITHUB_OUTPUT"
 
-      - name: Put image into PROD with release tag
-        id: put_prod
+      - name: Copy image from STAGING to PROD (docker pull/tag/push)
+        id: copy_image
         env:
-          DST_REPO_PATH:   ${{ steps.paths.outputs.dst_repo_path }}
-          MEDIA:           ${{ steps.manifest.outputs.media_type }}
-          MANIFEST_JSON:   ${{ steps.manifest.outputs.manifest }}
+          REGISTRY:           ${{ env.REGISTRY }}
+          ECR_REPOSITORY:     ${{ env.ECR_REPOSITORY }}
+          DIGEST:             ${{ steps.digest_src.outputs.digest }} # sha256:...
         run: |
           set -euo pipefail
 
-          if [[ -n "${MEDIA:-}" && "${MEDIA}" != "None" ]]; then
-            aws ecr put-image \
-              --repository-name "$DST_REPO_PATH" \
-              --image-tag "${GITHUB_REF_NAME}" \
-              --image-manifest "$MANIFEST_JSON" \
-              --image-manifest-media-type "$MEDIA"
-          else
-            aws ecr put-image \
-              --repository-name "$DST_REPO_PATH" \
-              --image-tag "${GITHUB_REF_NAME}" \
-              --image-manifest "$MANIFEST_JSON"
-          fi
+          SRC_REF="${REGISTRY}/staging/${ECR_REPOSITORY}@${DIGEST}"
+          DST_REF_TAG="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_REF_NAME}"
+          # опционально: продублируем тег по SHA, если нужно
+          DST_REF_SHA="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_SHA}"
+
+          echo "Pull $SRC_REF"
+          docker pull "$SRC_REF"
+
+          echo "Tag to $DST_REF_TAG"
+          docker tag "$SRC_REF" "$DST_REF_TAG"
+
+          # если нужен второй тег по SHA:
+          echo "Tag to $DST_REF_SHA"
+          docker tag "$SRC_REF" "$DST_REF_SHA"
+
+          echo "Push $DST_REF_TAG"
+          docker push "$DST_REF_TAG"
+
+          echo "Push $DST_REF_SHA"
+          docker push "$DST_REF_SHA"
 
       - name: Resolve PROD digest by release tag
         id: digest_prod
