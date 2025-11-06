@@ -12,6 +12,9 @@ config:
     DB_USER: "prod_db_user"
     DB_PATH: "prod_db"
     DB_HOST: "database-1.cxgqusoocgmt.eu-north-1.rds.amazonaws.com"
+    PGSSLMODE: "require"
+    PGCONNECT_TIMEOUT: "10"
+
 
 api:
   replicas: 1
