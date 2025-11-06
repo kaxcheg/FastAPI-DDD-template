@@ -1,9 +1,6 @@
 name: Release to CI runner
 
 on:
-  push:
-    branches:
-      - 'release/**'
   workflow_dispatch: {}
 
 concurrency:
@@ -15,17 +12,12 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  NAMESPACE: staging
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-
 jobs:
   build_and_push:
     uses: ./.github/workflows/ci-push-to-ecr.yml
     secrets: inherit
 
-  deploy_staging:
+  deploy_ci_runner:
     needs: build_and_push
     uses: ./.github/workflows/cd-deploy-ci-runner.yml
     secrets: inherit

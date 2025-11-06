@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy-staging-${{ github.repository }}
+  group: push-ghcr-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
@@ -19,9 +19,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # outputs:
-    #   digest: ${{ steps.build.outputs.digest }}
-    #   version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
