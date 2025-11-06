@@ -12,6 +12,7 @@ on:
       registry:
         description: "ECR registry (e.g., 123456789012.dkr.ecr.eu-north-1.amazonaws.com)"
         value: ${{ jobs.build_and_push.outputs.registry }}
+  workflow_dispatch: {}
 
 
 concurrency:
