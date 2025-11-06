@@ -23,8 +23,8 @@ config:
     DB_TABLE_SCHEMA: "dddapitpl"
     BOOTSTRAP_FLAG: "true"
     BOOTSTRAP_ADMIN: "admin"
-    PGSSLMODE: "require"
-    PGCONNECT_TIMEOUT: "10"
+    PGSSLMODE: "prefer"
+    PGCONNECT_TIMEOUT: "0"
 
 secrets:
   existingName: "dddapitpl-secrets"
