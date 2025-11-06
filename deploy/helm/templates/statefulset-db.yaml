@@ -2,12 +2,12 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "dddapitpl.db-name" . }}
+  name: {{ include "dddapitpl.db-meta-name" . }}
   labels:
     {{- include "dddapitpl.labels" . | nindent 4 }}
     app.kubernetes.io/component: "db"
 spec:
-  serviceName: {{ include "dddapitpl.db-name" . }}
+  serviceName: {{ include "dddapitpl.db-meta-name" . }}
   replicas: 1
   selector:
     matchLabels:
@@ -23,7 +23,7 @@ spec:
         {{- include "dddapitpl.labels" . | nindent 8 }}
         app.kubernetes.io/component: "db"
     spec:
-      serviceAccountName: {{ include "dddapitpl.db-name" . }}
+      serviceAccountName: {{ include "dddapitpl.db-meta-name" . }}
       automountServiceAccountToken: false 
       containers:
         - name: db
