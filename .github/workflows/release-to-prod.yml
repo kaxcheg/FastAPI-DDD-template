@@ -1,4 +1,4 @@
-name: Promote staging image to PROD & deploy
+name: Release to prod
 
 on:
   push:
