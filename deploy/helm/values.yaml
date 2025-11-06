@@ -23,6 +23,8 @@ config:
     DB_TABLE_SCHEMA: "dddapitpl"
     BOOTSTRAP_FLAG: "true"
     BOOTSTRAP_ADMIN: "admin"
+    PGSSLMODE: "" # require
+    PGCONNECT_TIMEOUT: "" # 10
 
 secrets:
   existingName: "dddapitpl-secrets"
@@ -55,6 +57,9 @@ api:
     - DB_TABLE_SCHEMA
     - BOOTSTRAP_FLAG
     - BOOTSTRAP_ADMIN
+    - PGSSLMODE
+    - PGCONNECT_TIMEOUT
+
 
   secretFilesPath:
     JWT_SECRET_PATH: jwt_secret

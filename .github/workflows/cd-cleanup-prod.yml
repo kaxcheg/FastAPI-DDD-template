@@ -1,4 +1,4 @@
-name: CD cleanup staging (uninstall & wipe PVC)
+name: CD cleanup prod (uninstall)
 
 on:
   workflow_dispatch: {}
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  NAMESPACE: staging
+  NAMESPACE: prod
   RELEASE: dddapitpl
 
 jobs:
@@ -28,6 +28,5 @@ jobs:
         shell: bash
         run: |
           helm uninstall "$RELEASE" -n "$NAMESPACE" || true
-          kubectl -n "$NAMESPACE" delete pvc -l app.kubernetes.io/instance="$RELEASE" || true
       - name: (Optional) Keep log group; no action
         run: echo "CloudWatch logs retained by design"

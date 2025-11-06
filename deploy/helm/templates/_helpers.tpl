@@ -10,7 +10,7 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "dddapitpl.db-name" -}}
+{{- define "dddapitpl.db-host-name" -}}
 {{- if .Values.config.data.DB_HOST -}}
 {{- .Values.config.data.DB_HOST -}}
 {{- else -}}
