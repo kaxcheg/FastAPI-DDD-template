@@ -100,6 +100,15 @@ jobs:
           echo "$MANIFEST_JSON"           >> "$GITHUB_OUTPUT"
           echo "EOF"                      >> "$GITHUB_OUTPUT"
 
+      - name: Derive API_VERSION
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [[ "$REF_NAME" == release/* ]]; then
+            echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
+          else
+            echo "API_VERSION=no_version" >> "$GITHUB_ENV"
+          fi
+
       - name: Copy image from STAGING to PROD (docker pull/tag/push)
         id: copy_image
         env:
@@ -110,22 +119,19 @@ jobs:
           set -euo pipefail
 
           SRC_REF="${REGISTRY}/staging/${ECR_REPOSITORY}@${DIGEST}"
-          DST_REF_TAG="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_REF_NAME}"
-          # опционально: продублируем тег по SHA, если нужно
           DST_REF_SHA="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_SHA}"
 
           echo "Pull $SRC_REF"
           docker pull "$SRC_REF"
 
-          echo "Tag to $DST_REF_TAG"
-          docker tag "$SRC_REF" "$DST_REF_TAG"
+          echo "Tag to ${{ env.API_VERSION }}"
+          docker tag "$SRC_REF" ${{ env.API_VERSION }}"
 
-          # если нужен второй тег по SHA:
           echo "Tag to $DST_REF_SHA"
           docker tag "$SRC_REF" "$DST_REF_SHA"
 
-          echo "Push $DST_REF_TAG"
-          docker push "$DST_REF_TAG"
+          echo "Push ${{ env.API_VERSION }}"
+          docker push ${{ env.API_VERSION }}"
 
           echo "Push $DST_REF_SHA"
           docker push "$DST_REF_SHA"
