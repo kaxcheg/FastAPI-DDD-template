@@ -7,7 +7,8 @@ provides a minimal yet complete example of how to structure a service
 with clear boundaries between the domain, application, infrastructure
 and interface layers. The project centres around a simple user domain
 with two use cases: user creation and user authentication. The project 
-includes simple Docker compose deployment solution.
+includes Docker Compose deployment solution for local dev, GitHub 
+AWS deployment workflows.
 
 ## Features
 
@@ -43,18 +44,24 @@ includes simple Docker compose deployment solution.
 -   **Configuration via environment variables** -- all configuration is
     loaded through a single Pydantic settings class with prefixes,
     supporting different environments (development, testing, production).
-    Example `.env` files for development and production are provided to
+    Example `.env` files for development are provided to
     help you get started.
 -   **Database migrations** -- Alembic is configured for schema
     migrations; an example migration creating the `users` table is
     included.
--   **Docker and Docker Compose** -- a production‑ready container image
-    can be built via the provided `Dockerfile`, and `docker‑compose.yml` for running
-    the app together with PostgreSQL. Secrets are mounted from files to
-    avoid hard‑coding credentials.
 -   **Admin bootstrapping script** -- a helper script `bootstrap.py`
     can create an initial administrator account using environment
     variables if the bootstrap flag is enabled.
+-   **Docker and Docker Compose** -- a container image
+    can be built via the provided `Dockerfile`, and `docker‑compose.yml` for running
+    the app together with PostgreSQL for local development.
+-   **AWS deployment** -- CI/CD pipelines for automatic build, testing, and deployment in AWS 
+    using unified Helm manifests for three environments — CI-runner (fast deployment, 
+    stateless Postgres), staging (statefulset Postgres in Pod), and production (RDS).
+-   **CI pipelines** --  for running linters, unit, and integration tests for checking 
+    pull requests and pushes to feature/* branches. Triggers in CI/CD: deployment to staging 
+    on push to release/* branch, deployment to production on vX.Y.Z tag, ensuring compliance 
+    with GitFlow practice.
 
 ## Architecture overview
 
@@ -101,57 +108,59 @@ git clone https://github.com/kaxcheg/dddapitpl.git
 cd dddapitpl
 ```
 
-2.  **Configure environment variables**
-
-Copy the provided development example and adjust values as needed:
-
+### Running in local development environment
 ```
-cp .env_example.dev .env.dev
+make build
+make up
 ```
+Run with provided VS Code configuration in ./vscode or another IDE with debugpy connection.
+See ./dev/env.dev for config.
 
-The `.env.dev` file defines variables such as database credentials, JWT
-secret, and server host/port.
-Ensure PostgreSQL is running locally and the credentials match.
+### Running in CI/CD
+In .github/workflows there are several workflows for automatic build, testing, and deployment 
+in AWS or GitHub runner using unified Helm manifests for three environments — CI-runner (fast deployment, stateless 
+Postgres), staging (statefulset Postgres in Pod), and production (RDS). Configure "ci-runner" 
+environment in GitHub and vars and secrets in
 
-3.  **Install dependencies**
+GitHub:
 
-Use Poetry to install the project in a virtual environment:
-
+"ci-runner" environment secrets:
 ```
-poetry install
-```
-
-4.  **Run database migrations**
-
-Initialize the schema using Alembic:
-
-```
-poetry run alembic upgrade head
+BOOTSTRAP_ADMIN_PASSWORD_HASH
+DB_ADMIN_SECRET
+DB_USER_SECRET
+JWT_SECRET
 ```
 
-5.  **Start the application**
-
-Launch the API with Uvicorn:
-
+"ci-runner" environment vars:
 ```
-poetry run uvicorn app.interface.http.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The interactive documentation will be available at
-`http://localhost:8000/docs`.
-
-6.  **Create an admin user (optional)**
-
-To bootstrap an initial administrator, set `BOOTSTRAP_FLAG=true`
-and provide `BOOTSTRAP_ADMIN` and `BOOTSTRAP_ADMIN_PASSWORD_HASH` (bcrypt hash) in
-your environment. Then run:
-
-```
-poetry run python -m app.scripts.bootstrap
+AWS_ACCOUNT_ID
+AWS_REGION
+ECR_REPOSITORY
+EIP_ALLOCATION_ID
+SECURITY_GROUP_ID
 ```
 
-The script will create an admin account if it does not already
-exist
+repository secret
+```
+AWS_ROLE_TO_ASSUME - ARN of AWS IAN role
+```
+
+AWS secrets:
+```
+STAGING_BOOTSTRAP_ADMIN_PASSWORD_HASH
+STAGING_JWT_SECRET
+STAGING_DB_USER_SECRET
+STAGING_DB_ADMIN_SECRET
+PROD_DB_ADMIN_SECRET
+PROD_DB_USER_SECRET
+PROD_JWT_SECRET
+PROD_BOOTSTRAP_ADMIN_PASSWORD_HASH
+```
+
+Triggers for running are configured for deployment to staging on push to release/* branches, 
+deployment to production on vX.Y.Z tag, ensuring compliance with GitFlow practice.
+Release to CI runner workflow can be run manually.
 
 ### Running tests
 
@@ -197,43 +206,6 @@ curl -X POST \
 A simple `GET /health` endpoint is provided to check the service status.
 It returns `{ "status": "ok" }` when the service is
 running.
-
-## Running with Docker Compose
-
-To run the application together with PostgreSQL using Docker Compose:
-
-1.  **Build the application image**
-
-Use the provided `ci-cd/Dockerfile` to build the image:
-
-```
-docker build -t dddapitpl-app:0.1.0 -f ci-cd/Dockerfile .
-```
-
-2.  **Use the included compose file**
-
-A ready‑made `deploy/docker-compose.yml` is included. 
-
-3.  **Create compose secrets**
-
-Automatically create the secret files expected by the compose file using the provided script. Values can be supplied the command line or file:
-
-```
-python ./deploy/create_compose_secrets.py
-```
-
-4.  **Run**
-
-```
-docker compose --env-file ./deploy/.env.prod -f ./deploy/docker-compose.yml up -d
-
-```
-
-The compose file defines services for the database, a one‑time bootstrap
-container that runs migrations and optionally creates the admin user,
-and the application itself.
-Environment variables are passed through and secrets are mounted as
-files to `/run/secrets` inside the container.
 
 ## Contributing
 
