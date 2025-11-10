@@ -41,7 +41,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: {{ .component | quote }}
 {{- end -}}
 
-# repo@sha256:digest или repo:tag
+# repo@sha256:digest/repo:tag
 {{- define "dddapitpl.image" -}}
 {{- $repo := .repository -}}
 {{- $digest := .digest | default "" -}}
