@@ -119,19 +119,20 @@ jobs:
           set -euo pipefail
 
           SRC_REF="${REGISTRY}/staging/${ECR_REPOSITORY}@${DIGEST}"
+          DST_VER_TAG="${REGISTRY}/prod/${ECR_REPOSITORY}:${{ env.API_VERSION }}"
           DST_REF_SHA="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_SHA}"
 
           echo "Pull $SRC_REF"
           docker pull "$SRC_REF"
 
-          echo "Tag to ${{ env.API_VERSION }}"
-          docker tag "$SRC_REF" "${{ env.API_VERSION }}"
+          echo "Tag to $DST_VER_TAG"
+          docker tag "$SRC_REF" "$DST_VER_TAG"
 
           echo "Tag to $DST_REF_SHA"
           docker tag "$SRC_REF" "$DST_REF_SHA"
 
-          echo "Push ${{ env.API_VERSION }}"
-          docker push "${{ env.API_VERSION }}"
+          echo "Push $DST_VER_TAG"
+          docker push "$DST_VER_TAG"
 
           echo "Push $DST_REF_SHA"
           docker push "$DST_REF_SHA"
