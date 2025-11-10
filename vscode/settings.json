@@ -1,0 +1,13 @@
+{
+    "python.testing.pytestArgs": [
+        "--envfile=./dev/env.dev",
+        "tests",
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.indexing": true,
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.envFile": "${workspaceFolder}/dev/env.dev"
+}
