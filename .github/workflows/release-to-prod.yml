@@ -125,7 +125,7 @@ jobs:
           docker pull "$SRC_REF"
 
           echo "Tag to ${{ env.API_VERSION }}"
-          docker tag "$SRC_REF" ${{ env.API_VERSION }}"
+          docker tag "$SRC_REF" ${{ env.API_VERSION }}
 
           echo "Tag to $DST_REF_SHA"
           docker tag "$SRC_REF" "$DST_REF_SHA"
