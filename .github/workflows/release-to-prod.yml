@@ -115,11 +115,12 @@ jobs:
           REGISTRY:           ${{ env.REGISTRY }}
           ECR_REPOSITORY:     ${{ env.ECR_REPOSITORY }}
           DIGEST:             ${{ steps.digest_src.outputs.digest }} # sha256:...
+          API_VERSION:        ${{ env.API_VERSION }}         
         run: |
           set -euo pipefail
 
           SRC_REF="${REGISTRY}/staging/${ECR_REPOSITORY}@${DIGEST}"
-          DST_VER_TAG="${REGISTRY}/prod/${ECR_REPOSITORY}:${{ env.API_VERSION }}"
+          DST_VER_TAG="${REGISTRY}/prod/${ECR_REPOSITORY}:${API_VERSION}"
           DST_REF_SHA="${REGISTRY}/prod/${ECR_REPOSITORY}:${GITHUB_SHA}"
 
           echo "Pull $SRC_REF"
@@ -137,14 +138,17 @@ jobs:
           echo "Push $DST_REF_SHA"
           docker push "$DST_REF_SHA"
 
+
+
       - name: Resolve PROD digest by release tag
         id: digest_prod
         env:
           DST_REPO_PATH: ${{ steps.paths.outputs.dst_repo_path }}
+          API_VERSION:  ${{ env.API_VERSION }}
         run: |
           DIGEST=$(aws ecr describe-images \
             --repository-name "$DST_REPO_PATH" \
-            --image-ids imageTag="${GITHUB_REF_NAME}" \
+            --image-ids imageTag="$API_VERSION" \
             --query 'imageDetails[0].imageDigest' \
             --output text)
           if [ -z "$DIGEST" ] || [ "$DIGEST" = "None" ]; then
