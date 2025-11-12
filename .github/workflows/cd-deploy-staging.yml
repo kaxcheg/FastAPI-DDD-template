@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 0. kernel / sysctl preflight (как в ручной последовательности)
+          # 0. kernel / sysctl preflight
           sudo modprobe overlay || true
           sudo modprobe br_netfilter || true
           sudo tee /etc/sysctl.d/99-k3s.conf >/dev/null <<'EOF'
@@ -55,14 +55,12 @@ jobs:
           EOF
           sudo sysctl --system || true
 
-          # 1. динамически определяем основной интерфейс — НЕ eth0
           PRIMARY_IFACE=$(ip route get 1.1.1.1 | awk '/dev/ {for (i=1;i<=NF;i++) if ($i=="dev") {print $(i+1); exit}}')
           if [[ -z "$PRIMARY_IFACE" ]]; then
             echo "Cannot detect primary interface" >&2
             exit 1
           fi
 
-          # 2. берём приватный IP из IMDS
           TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
 
@@ -81,20 +79,17 @@ jobs:
           EOF
 
 
-          # 3. если k3s не запущен — ставим «чисто», как вручную
           if ! systemctl is-active --quiet k3s; then
             if [ -x /usr/local/bin/k3s-killall.sh ]; then sudo /usr/local/bin/k3s-killall.sh || true; fi
             if [ -x /usr/local/bin/k3s-uninstall.sh ]; then sudo /usr/local/bin/k3s-uninstall.sh || true; fi
             sudo rm -rf /etc/rancher/k3s /var/lib/rancher/k3s || true
 
-            # скачиваем, но стартует systemd, уже с нашим config.yaml
             curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s -
           fi
 
           sudo systemctl daemon-reload
           sudo systemctl enable --now k3s
 
-          # 4. kubeconfig для runner'а
           install -d -m 755 "$HOME/.kube"
           sudo install -m 600 -o "$(id -u)" -g "$(id -g)" /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
           echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
@@ -221,7 +216,6 @@ jobs:
           TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 
-          # Применим hop-limit=2 и требуем IMDSv2 токены (idempotent)
           aws ec2 modify-instance-metadata-options \
             --instance-id "$INSTANCE_ID" \
             --region "$AWS_REGION" \
@@ -325,7 +319,7 @@ jobs:
           done
           echo "::endgroup::"
 
-          # --- DB workload (Deployment или StatefulSet) ---
+          # --- DB workload ---
           echo "::group::Wait DB"
           db_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
             -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db \
@@ -342,7 +336,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-          # --- DB bootstrap job (если включено) ---
+          # --- DB bootstrap job ---
           echo "::group::DB bootstrap job"
           if kubectl -n "$ns" get job "${rel}-db-bootstrap" >/dev/null 2>&1; then
             kubectl -n "$ns" wait job/"${rel}-db-bootstrap" --for=condition=complete --timeout=1m || {
@@ -356,7 +350,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-          # --- API workload (Deployment или StatefulSet) ---
+          # --- API workload  ---
           echo "::group::Wait API"
           api_wl="$(kubectl -n "$ns" get statefulset.apps,deployment.apps \
             -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api \
@@ -400,7 +394,7 @@ jobs:
           kubectl -n "$ns" get events --sort-by=.metadata.creationTimestamp | tail -n 100 || true
           echo "::endgroup::"
 
-          # --- DB pod (1 шт) ---
+          # --- DB pod ---
           echo "::group::DB pod logs"
           db_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=db -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
           if [ -n "${db_pod:-}" ]; then
@@ -411,7 +405,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-          # --- DB bootstrap job (если есть) ---
+          # --- DB bootstrap job ---
           echo "::group::DB bootstrap job"
           if kubectl -n "$ns" get job "$rel"-db-bootstrap --request-timeout="$KUBECTL_TIMEOUT" >/dev/null 2>&1; then
             kubectl -n "$ns" describe job "$rel"-db-bootstrap | tail -n 200 || true
@@ -424,7 +418,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-          # --- API pod (1 шт) ---
+          # --- API pod ---
           echo "::group::API pod logs"
           api_pod="$(kubectl -n "$ns" get pods -l app.kubernetes.io/instance="$rel",app.kubernetes.io/component=api -o name --request-timeout="$KUBECTL_TIMEOUT" | head -n1 || true)"
           if [ -n "${api_pod:-}" ]; then
