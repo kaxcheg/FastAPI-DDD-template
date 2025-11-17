@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import traceback
 from typing import Awaitable, Callable, Final
+from uuid import UUID
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from app.config.logging import get_logger
+from app.infrastructure.db.sqlalchemy.adapters.services import AuthPayload
+from app.infrastructure.security.jwt_service import (
+    JwtTokenExpired,
+    JwtTokenInvalid,
+    JwtTokenService,
+)
 from app.interface.http.routes import login, users
+from app.interface.http.routes.dependencies import get_jwt_service
 
 logger = get_logger(__name__)  # Reuse module-level logger.
 
@@ -16,12 +26,42 @@ def create_app() -> FastAPI:
     """Create and configure FastAPI application instance."""
 
     app = FastAPI(title="dddapitpl")
-    app.include_router(users.router, tags=["User"])
-    app.include_router(login.router, tags=["Login"])
+    app.include_router(users.router, prefix="/users", tags=["Users"])
+    app.include_router(login.router, prefix="/auth", tags=["Authentication"])
     return app
 
 
 app = create_app()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],  # Swagger UI
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="dddapitpl",
+        version="0.0.1",
+        routes=app.routes,
+    )
+
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    }
+
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
 @app.get("/health", tags=["Health"])
@@ -51,6 +91,58 @@ async def catch_unhandled_exceptions_middleware(
         return JSONResponse(
             status_code=500, content={"detail": "Internal server error"}
         )
+
+
+PUBLIC_PREFIXES = ("/docs", "/openapi.json", "/redoc", "/health", "/auth/login")
+
+
+@app.middleware("http")
+async def check_user_auth_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Check if user session is expired."""
+    if request.method == "OPTIONS" or any(
+        request.url.path.startswith(p) for p in PUBLIC_PREFIXES
+    ):
+        return await call_next(request)
+
+    sid_cookie = request.cookies.get("session_id")
+    auth_header = request.headers.get("Authorization", "")
+
+    if sid_cookie and auth_header.startswith("Bearer "):
+        token_service: JwtTokenService = get_jwt_service()
+        try:
+            token = token_service.decode(auth_header[len("Bearer ") :])
+        except (JwtTokenInvalid, JwtTokenExpired):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Not authorized."},
+            )
+
+        user_id = token.get("sub")
+        sid = token.get("sid")
+        user_role = token.get("role")
+        if (
+            user_id
+            and isinstance(user_id, str)
+            and sid
+            and isinstance(sid, str)
+            and sid == sid_cookie
+            and user_role
+            and isinstance(user_role, str)
+        ):
+            request.state.auth_payload = AuthPayload(
+                user_id=UUID(user_id),
+                session_id=UUID(sid),
+                role=user_role,
+            )
+
+            return await call_next(request)
+
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Not authorized."}
+    )
 
 
 @app.middleware("http")

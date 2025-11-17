@@ -20,8 +20,10 @@ class BaseConfig(BaseSettings):
     DEBUG: bool
 
     JWT_ALGORITHM: str
-    JWT_TOKEN_EXPIRY_TIME: int
+    JWT_TOKEN_EXPIRY_TIME: int = 30  # in minutes
     JWT_SECRET: SecretStr
+
+    SESSION_EXPIRY_TIME: int = 60  # in minutes
 
     DB_PATH: str
     DB_HOST: str

@@ -12,7 +12,8 @@ from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
 from app.domain.exceptions.base import DomainError
 from app.domain.value_objects import Username, UserPasswordHash, UserRole
-from app.infrastructure.db.sqlalchemy.adapters import UoWSQL, UUIDv4Generator
+from app.infrastructure.db.sqlalchemy.adapters.services import UUIDv4Generator
+from app.infrastructure.db.sqlalchemy.adapters.uow import UoWSQL
 
 cfg = get_settings()
 engine = create_async_engine(str(cfg.DB_URL), pool_pre_ping=True)

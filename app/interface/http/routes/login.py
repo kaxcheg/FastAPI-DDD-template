@@ -1,17 +1,23 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.security import OAuth2PasswordRequestForm
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dto import AuthRequestDTO, AuthResponseDTO
 from app.application.ports.presenters import State
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.config.logging import get_logger
+from app.infrastructure.db.sqlalchemy.user_session_service import UserSessionService
 from app.infrastructure.security.jwt_service import JwtTokenService
 from app.interface.http.adapters.presenters import FastAPIAuthenticationPresenter
 from app.interface.http.routes.dependencies import (
     get_authenticate_user_uc,
     get_jwt_service,
+    get_user_session_service,
+    get_db_session,
 )
 from app.interface.http.schemas import ErrorResponse, Token
 from app.interface.http.utils import raise_for_presenter_400_state
@@ -30,6 +36,11 @@ logger = get_logger(__name__)
     },
 )
 async def login(
+    user_session_service: Annotated[
+        UserSessionService, Depends(get_user_session_service)
+    ],
+    db_session: Annotated[AsyncSession, Depends(get_db_session)],
+    response: Response,
     form: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
     uc: Annotated[AuthenticateUserUseCase, Depends(get_authenticate_user_uc)],
     token_service: Annotated[JwtTokenService, Depends(get_jwt_service)],
@@ -49,12 +60,33 @@ async def login(
     await uc.execute(dto, presenter)
 
     if presenter.state is State.OK and isinstance(presenter.response, AuthResponseDTO):
-        token = token_service.issue(
-            claims={"sub": presenter.response.user_id, "role": presenter.response.role}
-        )
+        user_id = presenter.response.user_id
+        async with db_session.begin():
+            user_session = await user_session_service.create(user_id=UUID(user_id))
+            token = token_service.issue(
+                claims={
+                    "sub": user_id,
+                    "role": presenter.response.role,
+                    "sid": str(user_session.id),
+                }
+            )
         logger.info(
-            {"event": "token_created", "user_id": f"{presenter.response.user_id}"}
+            {
+                "event": "token_created",
+                "user_id": f"{presenter.response.user_id}",
+                "session_id": str(user_session.id),
+            }
         )
+
+        response.set_cookie(
+            key="session_id",
+            value=str(user_session.id),
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=3600,
+        )
+
         return Token(access_token=token, token_type="Bearer")
 
     # Always raise on non-OK states

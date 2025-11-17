@@ -5,7 +5,10 @@ from typing import override
 import bcrypt
 
 from app.application.ports.services import PasswordHasher, PasswordVerifier
-from app.domain.value_objects import UserPasswordHash, UserRawPassword
+from app.domain.value_objects import (
+    UserPasswordHash,
+    UserRawPassword,
+)
 
 
 class BcryptHasher(PasswordHasher):
