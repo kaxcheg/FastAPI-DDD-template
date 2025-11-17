@@ -17,7 +17,7 @@ class TestAuthorizeUseCase(AuthorizeUserUseCase[DTO, DTO]):
 async def test_authorize_success(uow_factory, successful_auth_service):
     """Test authentication fails with wrong password."""
     
-    uc = TestAuthorizeUseCase(uow_factory, successful_auth_service, UserRole.ADMIN)
+    uc = TestAuthorizeUseCase(successful_auth_service, UserRole.ADMIN)
 
     presenter = FakeAuthorizationPresenter()
     dto = DTO()
@@ -33,7 +33,7 @@ async def test_authorize_user_not_authenticated(uow_factory):
         is_role_ensured=True,
         is_user_found=False,
     )
-    uc = TestAuthorizeUseCase(uow_factory, auth_service, UserRole.USER)
+    uc = TestAuthorizeUseCase(auth_service, UserRole.USER)
     presenter = FakeAuthorizationPresenter()
     
     await uc.execute(DTO(), presenter)
@@ -50,7 +50,7 @@ async def test_authorize_insufficient_role(uow_factory):
         is_user_found=True,
     )
     
-    uc = TestAuthorizeUseCase(uow_factory, auth_service, UserRole.ADMIN)
+    uc = TestAuthorizeUseCase(auth_service, UserRole.ADMIN)
     presenter = FakeAuthorizationPresenter()
     
     await uc.execute(DTO(), presenter)

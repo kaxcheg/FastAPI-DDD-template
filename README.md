@@ -166,18 +166,25 @@ Release to CI runner workflow can be run manually.
 
 Install development dependencies and run the test suite with pytest:
 
-```
+```bash
 poetry install --with dev
-poetry run pytest
+
+# Run only unit tests (fast, no Docker required)
+poetry run pytest tests/unit -v
+
+# Run only integration tests (requires Docker)
+poetry run pytest tests/integration -v
 ```
+
+**Note**: Integration tests require Docker to be running, as they use testcontainers to spin up a PostgreSQL instance. See [tests/integration/README.md](tests/integration/README.md) for more details.
 
 ## Usage
 
 ### Authentication
 
-The API uses JWT tokens. Obtain a token by sending a `POST` request to
+The API uses JWT tokens and session ids. Obtain a token by sending a `POST` request to
 `/login` with `username` and `password` form fields. On success the
-endpoint returns a bearer token:
+endpoint returns a bearer token and session_id cookie:
 
 ```
 curl -X POST \

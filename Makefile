@@ -1,7 +1,7 @@
 # Makefile for dddapitpl (full, Dockerfile in repo root)
 # Usage examples:
 #   make build
-#   make up ENV_FILE=.env.dev       # docker compose with env file
+#   make up DEV_ENV_FILE=.env.dev       # docker compose with env file
 #
 # Override variables via env or cli:
 #   make IMAGE=myimage TAG=1.2.3 COMPOSE_FILE=docker-compose.yml
@@ -27,11 +27,12 @@ BUILD_PLATFORMS ?= linux/amd64
 
 # docker-compose / env
 COMPOSE_FILE ?= ./dev/docker-compose.yml
-ENV_FILE ?= ./dev/env.dev
+DEV_ENV_FILE ?= ./dev/env.dev
 
 # Tests
 PYTEST ?= pytest
 TEST_DIR ?= tests
+TEST_ENV_FILE ?= ./env.test
 
 # Utilities
 JQ ?= jq
@@ -40,7 +41,7 @@ JQ ?= jq
 # Phony targets
 # -----------------------
 .PHONY: help build compose-build up down restart logs ps db-up db-down \
-        bootstrap run test itest lint clean images rm-image
+        bootstrap run test test-unit test-int test-e2e lint clean images rm-image
 
 # -----------------------
 # Help
@@ -49,7 +50,7 @@ help:
 	@printf "\nMakefile targets:\n\n"
 	@printf "  build            Build the application image (buildx).
 	@printf "  compose-build    Build services via docker compose (if compose build contexts exist)\n"
-	@printf "  up               docker compose up (uses --env-file $(ENV_FILE))\n"
+	@printf "  up               docker compose up (uses --env-file $(DEV_ENV_FILE))\n"
 	@printf "  down             docker compose down\n"
 	@printf "  restart          down then up\n"
 	@printf "  logs             docker compose logs -f\n"
@@ -58,8 +59,9 @@ help:
 	@printf "  db-down          stop/remove db service\n"
 	@printf "  bootstrap        run db-bootstrap one-shot service (compose)\n"
 	@printf "  run              run app locally via uvicorn (requires local python env)\n"
-	@printf "  test             run unit tests (pytest in $(TEST_DIR))\n"
-	@printf "  itest            integration tests placeholder (stub)\n"
+	@printf "  test             run all tests (unit + integration, requires Docker)\n"
+	@printf "  test-unit        run only unit tests (fast, no Docker)\n"
+	@printf "  test-int         run only integration tests (requires Docker)\n"
 	@printf "  lint             run linters if installed (black/ruff/isort/mypy)\n"
 	@printf "  clean            remove compose containers and local image $(FULL_IMAGE)\n"
 	@printf "  images           list local images for $(IMAGE)\n"
@@ -78,7 +80,7 @@ build:
 compose-build:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
 	  echo "Building compose services from $(COMPOSE_FILE)..."; \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) build; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) build; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
@@ -89,8 +91,8 @@ compose-build:
 
 up:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  echo "docker compose up using env $(ENV_FILE) ..."; \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) up -d; \
+	  echo "docker compose up using env $(DEV_ENV_FILE) ..."; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) up -d; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
@@ -98,7 +100,7 @@ up:
 down:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
 	  echo "docker compose down..."; \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) down; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) down; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
@@ -110,14 +112,14 @@ logs-api:
 
 logs:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) logs -f; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) logs -f; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
 
 ps:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) ps; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) ps; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
@@ -125,15 +127,15 @@ ps:
 # Start only DB service (compose 'db')
 db-up:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) up -d db; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) up -d db; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
 
 db-down:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) stop db || true; \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) rm -f db || true; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) stop db || true; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) rm -f db || true; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
 	fi
@@ -141,7 +143,7 @@ db-down:
 # Run DB bootstrap one-shot (compose 'db-bootstrap')
 bootstrap:
 	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) up --abort-on-container-exit db-bootstrap; \
+	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) up --abort-on-container-exit db-bootstrap; \
 	  RC=$$?; echo "db-bootstrap exit code: $$RC"; exit $$RC; \
 	else \
 	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
@@ -150,19 +152,20 @@ bootstrap:
 # Local dev run (requires python env)
 run:
 	@echo "Run uvicorn (dev). Activate venv and ensure dependencies are installed."
-	uvicorn app.interface.http.main:app --reload  --env-file $(ENV_FILE) --host 0.0.0.0 --port 8000
+	uvicorn app.interface.http.main:app --reload  --env-file $(DEV_ENV_FILE) --host 0.0.0.0 --port 8000
 
 # -----------------------
 # Tests / lint
 # -----------------------
 
 test-unit:
-	@echo "Running unit tests via pytest in $(TEST_DIR)..."
-	$(PYTEST) $(TEST_DIR) --envfile=$(ENV_FILE) -q
+	@echo "Running unit tests via pytest in $(TEST_DIR)/unit..."
+	$(PYTEST) $(TEST_DIR)/unit --envfile=$(TEST_ENV_FILE) -v
 
-# Integration tests placeholder (stub)
+# Integration tests (requires Docker for testcontainers)
 test-int:
-	@echo "Integration tests placeholder - implement actual integration suite."
+	@echo "Running integration tests (requires Docker)..."
+	$(PYTEST) $(TEST_DIR)/integration --envfile=$(TEST_ENV_FILE) -v
 
 # e2e tests placeholder (stub)
 test-e2e:
@@ -213,7 +216,7 @@ lint:
 
 clean:
 	@echo "Cleaning compose containers and local image $(FULL_IMAGE) ..."
-	-docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) down --remove-orphans --volumes 2>/dev/null || true
+	-docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) down --remove-orphans --volumes 2>/dev/null || true
 	-docker rm -f app db db-bootstrap 2>/dev/null || true
 	-docker rmi $(FULL_IMAGE) 2>/dev/null || true
 	-rm -f image_digest.txt 2>/dev/null || true
