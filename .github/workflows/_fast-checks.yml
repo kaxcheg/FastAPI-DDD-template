@@ -12,7 +12,7 @@ jobs:
   fast-check:
     runs-on: ubuntu-latest
     env:
-      ENV_FILE: ci/env.test
+      ENV_FILE: env.test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

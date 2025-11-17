@@ -32,6 +32,8 @@ ruff = "^0.13.1"
 isort = "^6.0.1"
 yamllint = "^1.37.1"
 debugpy = "^1.8.17"
+httpx = "^0.28.1"
+testcontainers = "^4.13.3"
 
 
 [tool.poetry]
@@ -39,10 +41,38 @@ package-mode = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_default_test_loop_scope = "session"
+asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["."]
+env_files = [
+    "./env.test",
+]
+markers = [
+    "integration: marks tests as integration tests (requires Docker)",
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+exclude = '''
+(
+    /alembic/
+)
+'''
+
+[tool.ruff]
+exclude = [
+    "alembic",
+    "venv",
+]
 
 [tool.isort]
 profile = "black"
+skip = [
+    "alembic",
+    "venv",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

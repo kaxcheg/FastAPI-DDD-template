@@ -59,17 +59,17 @@ def authenticate_use_case(uow_factory, password_verifier):
     return AuthenticateUserUseCase(uow_factory, password_verifier)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def password_hasher():
     """Password hasher fixture."""
     return FakePasswordHasher()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def id_generator():
     """ID generator fixture."""
     return FakeIdGenerator()
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def successful_auth_service():
     return FakeAuthService(is_user_found=True, is_role_ensured=True)

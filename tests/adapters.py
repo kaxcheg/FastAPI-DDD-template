@@ -7,7 +7,7 @@ from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, 
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, CredentialDTO
+from app.application.dto import AuthResponseDTO, CreateUserOutputDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
@@ -118,7 +118,7 @@ class FakeUoW(UnitOfWork):
         return cast(R, repo)
 
 
-class FakeAuthService(AuthService[UserRepository]):
+class FakeAuthService(AuthService):
     """Test authentication service implementation."""
     
     def __init__(self, is_role_ensured: bool, is_user_found: bool):
@@ -130,7 +130,7 @@ class FakeAuthService(AuthService[UserRepository]):
         if not self.is_role_ensured:
             raise NotAuthorizedError(f"User role {user_role} does not match target role {required_role}")
     
-    async def current_user(self, repo: UserRepository) -> User:
+    async def current_user(self) -> User:
         """Get current authenticated user."""
         if not self.is_user_found:
             raise NotAuthenticatedError("No authenticated user")

@@ -50,6 +50,7 @@ services:
       DEBUG: ${DEBUG}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       JWT_TOKEN_EXPIRY_TIME: ${JWT_TOKEN_EXPIRY_TIME}
+      SESSION_EXPIRY_TIME: ${SESSION_EXPIRY_TIME}
       DB_DRIVER: ${DB_DRIVER}
       DB_USER: ${DB_USER}
       DB_PATH: ${DB_PATH}
@@ -73,5 +74,7 @@ services:
     - 0.0.0.0
     - --port
     - "8000"
+    volumes:
+      - ../app/infrastructure/db/alembic:/dddapitpl/app/infrastructure/db/alembic
 volumes:
   pgdata: {}
