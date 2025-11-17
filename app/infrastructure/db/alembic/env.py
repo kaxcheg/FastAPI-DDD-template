@@ -11,6 +11,9 @@ from app.infrastructure.db.sqlalchemy.models.base import Base  # metadata scan
 from app.infrastructure.db.sqlalchemy.models.user import (  # noqa: F401  # ensure model import
     UserORM,
 )
+from app.infrastructure.db.sqlalchemy.models.user_sessions import (  # noqa: F401  # ensure model import
+    UserSessionORM,
+)
 
 settings = get_settings()
 config = context.config

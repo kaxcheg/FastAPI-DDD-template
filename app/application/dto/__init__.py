@@ -3,7 +3,6 @@ from app.application.dto.dto import (
     AuthResponseDTO,
     CreateUserInputDTO,
     CreateUserOutputDTO,
-    CredentialDTO,
 )
 
 __all__ = [
@@ -11,5 +10,4 @@ __all__ = [
     "AuthResponseDTO",
     "CreateUserInputDTO",
     "CreateUserOutputDTO",
-    "CredentialDTO",
 ]

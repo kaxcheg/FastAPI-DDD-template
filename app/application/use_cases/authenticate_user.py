@@ -50,6 +50,11 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
             self.logger.warning({"event": "auth_failed", "reason": "user_not_found"})
             return
 
+        if not user.is_active:
+            presenter.unauthorized("Not authorized")
+            self.logger.warning({"event": "auth_failed", "reason": "inactive_user"})
+            return
+
         try:
             ok = self._password_verifier.verify(
                 UserRawPassword(dto.raw_password), user.password_hash

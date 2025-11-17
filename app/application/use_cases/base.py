@@ -10,7 +10,6 @@ from app.application.ports import AuthPresenter, UnitOfWork
 from app.application.ports.presenters import Presenter
 from app.application.ports.services import AuthService
 from app.config.logging import get_logger
-from app.domain.entities.user.repo import UserRepository
 from app.domain.exceptions.base import DomainError
 from app.domain.value_objects import UserRole
 
@@ -24,7 +23,7 @@ class UseCase[I: DTO, O: DTO](ABC):
 class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
     """Use case base that checks authentication and role before execution."""
 
-    _auth: AuthService[UserRepository]
+    _auth: AuthService
     _required_role: UserRole
     _uow_factory: Callable[[], UnitOfWork]
 
@@ -32,12 +31,10 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
 
     def __init__(
         self,
-        uow_factory: Callable[[], UnitOfWork],
-        auth_service: AuthService[UserRepository],
+        auth_service: AuthService,
         required_role: UserRole,
     ) -> None:
         """Initialize with UoW factory, auth service and target role."""
-        self._uow_factory = uow_factory
         self._auth = auth_service
         self._required_role = required_role
 
@@ -45,13 +42,14 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
     async def execute(self, dto: I, presenter: AuthPresenter[O]) -> None:
         """Run use case with authentication and role check."""
         try:
-            async with self._uow_factory() as uow:
-                user_repo = uow.get_repo(UserRepository)
-                user = await self._auth.current_user(user_repo)
+            user = await self._auth.current_user()
         except (NotAuthenticatedError, DomainError):
             presenter.unauthorized("Not authorized")
             return
 
+        if not user.is_active:
+            presenter.unauthorized("Not authorized")
+            return
         try:
             self._auth.ensure_role(user.id, user.role, self._required_role)
         except NotAuthorizedError:

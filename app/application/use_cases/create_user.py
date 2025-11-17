@@ -13,7 +13,7 @@ from app.domain.entities.user.repo import UserRepository
 from app.domain.entities.user.user import User
 from app.domain.exceptions import ValueObjectError
 from app.domain.exceptions.base import DomainError
-from app.domain.services.services import IdGenerator
+from app.domain.ports.services import IdGenerator
 from app.domain.value_objects import Username, UserRawPassword, UserRole
 
 
@@ -25,7 +25,7 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
     @override
     def __init__(
         self,
-        auth_service: AuthService[UserRepository],
+        auth_service: AuthService,
         uow_factory: Callable[[], UnitOfWork],
         hasher: PasswordHasher,
         id_gen: IdGenerator,
@@ -33,9 +33,9 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
         """Initialize with dependencies."""
         super().__init__(
             auth_service=auth_service,
-            uow_factory=uow_factory,
             required_role=UserRole.ADMIN,
         )
+        self._uow_factory = uow_factory
         self._hasher = hasher
         self._id_gen = id_gen
 
