@@ -1,28 +1,29 @@
-from typing import Annotated
+from typing import Annotated, Callable
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.application.dto import AuthRequestDTO, AuthResponseDTO
+from app.application.ports.uow import UnitOfWork
 from app.application.ports.presenters import State
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
+from app.config import get_settings
 from app.config.logging import get_logger
-from app.infrastructure.db.sqlalchemy.user_session_service import UserSessionService
+from app.infrastructure.db.sqlalchemy.adapters.services import AuthPayload
+from app.infrastructure.db.sqlalchemy.user_session_repo import UserSessionORMRepo
 from app.infrastructure.security.jwt_service import JwtTokenService
-from app.interface.http.adapters.presenters import FastAPIAuthenticationPresenter
+from app.interface.http.adapters.presenters import FastAPIPresenter
 from app.interface.http.routes.dependencies import (
     get_authenticate_user_uc,
     get_jwt_service,
-    get_user_session_service,
-    get_db_session,
+    get_uow_factory
 )
 from app.interface.http.schemas import ErrorResponse, Token
 from app.interface.http.utils import raise_for_presenter_400_state
 
 router = APIRouter()
+cfg = get_settings()
 logger = get_logger(__name__)
 
 
@@ -31,16 +32,11 @@ logger = get_logger(__name__)
     status_code=200,
     response_model=Token,
     responses={
-        401: {"description": "Unauthorized", "model": ErrorResponse},
         422: {"description": "Unprocessable entity", "model": ErrorResponse},
     },
 )
 async def login(
-    user_session_service: Annotated[
-        UserSessionService, Depends(get_user_session_service)
-    ],
-    db_session: Annotated[AsyncSession, Depends(get_db_session)],
-    response: Response,
+    uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
     form: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
     uc: Annotated[AuthenticateUserUseCase, Depends(get_authenticate_user_uc)],
     token_service: Annotated[JwtTokenService, Depends(get_jwt_service)],
@@ -55,14 +51,19 @@ async def login(
     Returns:
         Token: Bearer access token on success.
     """
-    presenter = FastAPIAuthenticationPresenter()
+    presenter = FastAPIPresenter[AuthResponseDTO]()
     dto = AuthRequestDTO(username=form.username, raw_password=form.password)
     await uc.execute(dto, presenter)
 
     if presenter.state is State.OK and isinstance(presenter.response, AuthResponseDTO):
         user_id = presenter.response.user_id
-        async with db_session.begin():
-            user_session = await user_session_service.create(user_id=UUID(user_id))
+        async with uow_factory() as uow:
+            user_session_repo = uow.get_repo(UserSessionORMRepo)
+            user_session = await user_session_repo.create(
+                user_id=UUID(user_id), 
+                expiry_time=cfg.SESSION_EXPIRY_TIME,
+                max_sessions=cfg.MAX_CONCURRENT_SESSIONS
+            )
             token = token_service.issue(
                 claims={
                     "sub": user_id,
@@ -72,19 +73,10 @@ async def login(
             )
         logger.info(
             {
-                "event": "token_created",
+                "event": "login",
                 "user_id": f"{presenter.response.user_id}",
                 "session_id": str(user_session.id),
             }
-        )
-
-        response.set_cookie(
-            key="session_id",
-            value=str(user_session.id),
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=3600,
         )
 
         return Token(access_token=token, token_type="Bearer")
@@ -94,3 +86,27 @@ async def login(
         raise_for_presenter_400_state(presenter)
     else:
         raise ValueError("Wrong presenter response type")
+
+
+@router.post(
+    "/logout",
+    status_code=204
+)
+async def logout(
+    request: Request,
+    uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
+) -> None:
+    """Revoke current session and clear cookie."""
+    auth: AuthPayload = request.state.auth_payload
+
+    async with uow_factory() as uow:
+        user_session_repo = uow.get_repo(UserSessionORMRepo)
+        revoked = await user_session_repo.revoke(auth.session_id)
+
+    if revoked: 
+        logger.info({
+            "event": "logout", 
+            "user_id": str(auth.user_id),
+            "session_id": str(auth.session_id)
+        })
+        

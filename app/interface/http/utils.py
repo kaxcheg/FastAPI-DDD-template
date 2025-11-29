@@ -21,7 +21,7 @@ def raise_for_presenter_400_state(p: Presenter) -> NoReturn:
             )
         case State.CONFLICT:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=p.response)
-        case State.ERROR:
+        case State.DOMAIN_ERROR:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=p.response
             )

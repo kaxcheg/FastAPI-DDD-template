@@ -10,7 +10,7 @@ class State(Enum):
     """Operation result states."""
 
     OK = auto()
-    ERROR = auto()
+    DOMAIN_ERROR = auto()
     UNAUTHORIZED = auto()
     FORBIDDEN = auto()
     CONFLICT = auto()
@@ -36,9 +36,9 @@ class Presenter[D: DTO](Protocol):
         self._state = State.OK
         self.response = dto
 
-    def error(self, message: str) -> None:
+    def domain_error(self, message: str) -> None:
         """Set error state with message."""
-        self._state = State.ERROR
+        self._state = State.DOMAIN_ERROR
         self.response = message
 
     def conflict(self, message: str) -> None:

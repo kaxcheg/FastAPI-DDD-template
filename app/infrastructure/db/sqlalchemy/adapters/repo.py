@@ -4,10 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.exceptions import DuplicateUserError
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
+
+from app.application.exceptions import DuplicateUserError
+
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 
 
@@ -64,3 +66,19 @@ class UserRepositorySQL(UserRepository):
             await self._s.flush()
         except IntegrityError as e:
             raise DuplicateUserError(f"User {user.username} already exists") from e
+
+    @override
+    async def get_all(self) -> list[User]:
+        """Return all users from database."""
+        result = await self._s.scalars(select(UserORM))
+        rows = result.all()
+        return [
+            User.from_storage(
+                id=UserId(row.id),
+                username=Username(row.username),
+                password_hash=UserPasswordHash(row.password_hash),
+                role=UserRole(row.role),
+                is_active=row.is_active,
+            )
+            for row in rows
+        ]

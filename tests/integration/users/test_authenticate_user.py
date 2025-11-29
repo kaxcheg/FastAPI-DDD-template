@@ -1,47 +1,52 @@
 """Integration tests for authentication (login) use case.
 
-These tests verify the authentication flow through real HTTP endpoints,
-similar to tests/unit/application/test_authenticate_user.py but at integration level.
+These tests verify the authentication flow through real HTTP endpoints.
 """
 
 import pytest
 from httpx import AsyncClient
 
-from app.infrastructure.db.sqlalchemy.models.user import UserORM
-from tests.integration.test_data import IntegrationTestUsers
+from tests.integration.users.conftest import create_user_with_auth
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_success(api_client: AsyncClient, user_to_authenticate: UserORM):
+async def test_authenticate_user_success(api_client: AsyncClient, user_to_authenticate):
     """Test successful authentication with valid credentials."""
-    user_data = IntegrationTestUsers.REGULAR_USER
-
     response = await api_client.post(
         "/auth/login",
-        data={"username": user_to_authenticate.username, "password": user_data.raw_password},
+        data={"username": user_to_authenticate.username, "password": user_to_authenticate.password},
     )
 
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["token_type"] == "Bearer"
-    assert "session_id" in response.cookies
 
 
 @pytest.mark.asyncio
-async def test_authenticate_admin_success(api_client: AsyncClient, admin_user: UserORM):
+async def test_authenticate_admin_success(
+    api_client: AsyncClient,
+    db_session,
+    password_hasher,
+):
     """Test successful authentication as admin user."""
-    user_data = IntegrationTestUsers.ADMIN_USER
+    # Create admin user using factory
+    admin_data = await create_user_with_auth(
+        db_session,
+        password_hasher,
+        username="admin_user",
+        password="admin_pass123",
+        role="admin",
+    )
 
     response = await api_client.post(
         "/auth/login",
-        data={"username": admin_user.username, "password": user_data.raw_password},
+        data={"username": admin_data.username, "password": admin_data.password},
     )
 
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert "session_id" in response.cookies
 
 
 @pytest.mark.asyncio
@@ -58,7 +63,7 @@ async def test_authenticate_invalid_username(api_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_authenticate_invalid_password(
-    api_client: AsyncClient, user_to_authenticate: UserORM
+    api_client: AsyncClient, user_to_authenticate
 ):
     """Test authentication fails with incorrect password."""
     response = await api_client.post(
@@ -71,13 +76,25 @@ async def test_authenticate_invalid_password(
 
 
 @pytest.mark.asyncio
-async def test_authenticate_inactive_user(api_client: AsyncClient, inactive_user: UserORM):
+async def test_authenticate_inactive_user(
+    api_client: AsyncClient,
+    db_session,
+    password_hasher,
+):
     """Test authentication fails for inactive user (is_active=False)."""
-    user_data = IntegrationTestUsers.INACTIVE_USER
+    # Create inactive user using factory
+    inactive_data = await create_user_with_auth(
+        db_session,
+        password_hasher,
+        username="inactive_user",
+        password="inactive_pass123",
+        role="user",
+        is_active=False,
+    )
 
     response = await api_client.post(
         "/auth/login",
-        data={"username": inactive_user.username, "password": user_data.raw_password},
+        data={"username": inactive_data.username, "password": inactive_data.password},
     )
 
     assert response.status_code == 401
@@ -98,14 +115,12 @@ async def test_authenticate_empty_credentials(api_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_authenticate_case_sensitive_username(
-    api_client: AsyncClient, user_to_authenticate: UserORM
+    api_client: AsyncClient, user_to_authenticate
 ):
     """Test that username is case-sensitive."""
-    user_data = IntegrationTestUsers.REGULAR_USER
-
     response = await api_client.post(
         "/auth/login",
-        data={"username": user_to_authenticate.username.upper(), "password": user_data.raw_password},
+        data={"username": user_to_authenticate.username.upper(), "password": user_to_authenticate.password},
     )
 
     assert response.status_code == 401
@@ -114,24 +129,25 @@ async def test_authenticate_case_sensitive_username(
 
 @pytest.mark.asyncio
 async def test_authenticate_creates_session_in_db(
-    api_client: AsyncClient, user_to_authenticate: UserORM
+    api_client: AsyncClient, user_to_authenticate
 ):
     """Test that authentication creates a user session in database."""
     from uuid import UUID
     from sqlalchemy import select
+    import jwt
     from app.infrastructure.db.sqlalchemy.models.user_sessions import UserSessionORM
     from app.infrastructure.db.sqlalchemy.setup import get_session_factory
 
-    user_data = IntegrationTestUsers.REGULAR_USER
-
     response = await api_client.post(
         "/auth/login",
-        data={"username": user_to_authenticate.username, "password": user_data.raw_password},
+        data={"username": user_to_authenticate.username, "password": user_to_authenticate.password},
     )
 
     assert response.status_code == 200
-    session_id = response.cookies.get("session_id")
-    assert session_id is not None
+    # Extract session_id from JWT token
+    token = response.json()["access_token"]
+    decoded = jwt.decode(token, options={"verify_signature": False})
+    session_id = decoded["sid"]
 
     # Verify session exists in DB
     session_factory = get_session_factory()
@@ -143,56 +159,38 @@ async def test_authenticate_creates_session_in_db(
         user_session = result.scalar_one_or_none()
 
         assert user_session is not None
-        assert user_session.user_id == user_to_authenticate.id
+        assert user_session.user_id == user_to_authenticate.user_id
         assert user_session.revoked_at is None
         assert user_session.expires_at is not None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_session_cookie_attributes(
-    api_client: AsyncClient, user_to_authenticate: UserORM
-):
-    """Test that session cookie has correct security attributes."""
-    user_data = IntegrationTestUsers.REGULAR_USER
-
-    response = await api_client.post(
-        "/auth/login",
-        data={"username": user_to_authenticate.username, "password": user_data.raw_password},
-    )
-
-    assert response.status_code == 200
-
-    # Check cookie attributes
-    set_cookie = response.headers.get("set-cookie", "")
-    assert "session_id=" in set_cookie
-    assert "HttpOnly" in set_cookie
-    assert "samesite=lax" in set_cookie.lower()
-
-
-@pytest.mark.asyncio
 async def test_authenticate_multiple_logins_create_multiple_sessions(
-    api_client: AsyncClient, user_to_authenticate: UserORM
+    api_client: AsyncClient, user_to_authenticate
 ):
     """Test that multiple logins create separate sessions."""
     from sqlalchemy import select
+    import jwt
     from app.infrastructure.db.sqlalchemy.models.user_sessions import UserSessionORM
     from app.infrastructure.db.sqlalchemy.setup import get_session_factory
-
-    user_data = IntegrationTestUsers.REGULAR_USER
 
     # First login
     response1 = await api_client.post(
         "/auth/login",
-        data={"username": user_to_authenticate.username, "password": user_data.raw_password},
+        data={"username": user_to_authenticate.username, "password": user_to_authenticate.password},
     )
-    session_id_1 = response1.cookies.get("session_id")
+    token1 = response1.json()["access_token"]
+    decoded1 = jwt.decode(token1, options={"verify_signature": False})
+    session_id_1 = decoded1["sid"]
 
     # Second login
     response2 = await api_client.post(
         "/auth/login",
-        data={"username": user_to_authenticate.username, "password": user_data.raw_password},
+        data={"username": user_to_authenticate.username, "password": user_to_authenticate.password},
     )
-    session_id_2 = response2.cookies.get("session_id")
+    token2 = response2.json()["access_token"]
+    decoded2 = jwt.decode(token2, options={"verify_signature": False})
+    session_id_2 = decoded2["sid"]
 
     assert response1.status_code == 200
     assert response2.status_code == 200
@@ -202,7 +200,7 @@ async def test_authenticate_multiple_logins_create_multiple_sessions(
     session_factory = get_session_factory()
     async with session_factory() as session:
         stmt = select(UserSessionORM).where(
-            UserSessionORM.user_id == user_to_authenticate.id
+            UserSessionORM.user_id == user_to_authenticate.user_id
         )
         result = await session.execute(stmt)
         sessions = result.scalars().all()

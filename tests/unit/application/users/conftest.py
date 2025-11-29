@@ -4,15 +4,11 @@ from app.domain.value_objects import UserId, UserRole
 from app.domain.value_objects.constants import HASH_LEN
 
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
-from app.application.use_cases.create_user import CreateUserUseCase
 
 from tests.adapters import (
     TestUser, 
-    InMemoryUserRepository, 
     FakeUoW, 
     FakePasswordVerifier, 
-    FakeAuthenticationPresenter, 
-    FakeCreateUserPresenter, 
     FakeAuthService,
     FakePasswordHasher,
     FakeIdGenerator
@@ -43,8 +39,10 @@ def initial_users():
 @pytest.fixture
 def uow_factory(initial_users):
     """UoW factory fixture."""
+
+    uow = FakeUoW(initial_users)
     def factory():
-        return FakeUoW(initial_users)
+        return uow
     return factory
 
 

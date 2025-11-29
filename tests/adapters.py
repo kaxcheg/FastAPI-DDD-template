@@ -7,7 +7,7 @@ from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, 
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO
+from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
@@ -47,6 +47,9 @@ class FakeAuthorizationPresenter(AuthPresenter[DTO]):
 class FakeCreateUserPresenter(AuthPresenter[CreateUserOutputDTO]):
     """Test Auth presenter implementation."""
 
+class FakeGetAllUsersPresenter(AuthPresenter[GetAllUsersOutputDTO]):
+    """Test presenter for GetAllUsers use case."""
+
 
 class InMemoryUserRepository(UserRepository):
     """In-memory implementation of UserRepository."""
@@ -79,6 +82,10 @@ class InMemoryUserRepository(UserRepository):
             raise DuplicateUserError
         self.users_by_id[user.id] = user
         self.users_by_username[user.username] = user
+
+    async def get_all(self) -> list[User]:
+        """Get all users."""
+        return list(self.users_by_id.values())
         
         
 R = TypeVar("R", bound=Repository)
@@ -94,6 +101,7 @@ class FakeUoW(UnitOfWork):
 
     def __init__(self, initial_users: list[TestUser]):
         self.initial_users = initial_users
+        self._repos: dict[type[Repository], Repository] = {}
 
     async def _open(self) -> None:
         """Begin a new transactional session."""
@@ -112,10 +120,12 @@ class FakeUoW(UnitOfWork):
         pass
 
     def get_repo(self, iface: type[R]) -> R:
-        repo_class = self._REGISTRY[iface]
-        repo = repo_class(self.initial_users)
+        # Reuse existing repo instance to persist data between UoW sessions
+        if iface not in self._repos:
+            repo_class = self._REGISTRY[iface]
+            self._repos[iface] = repo_class(self.initial_users)
         from typing import cast
-        return cast(R, repo)
+        return cast(R, self._repos[iface])
 
 
 class FakeAuthService(AuthService):

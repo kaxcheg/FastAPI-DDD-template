@@ -14,8 +14,6 @@ Tests cover:
 import pytest
 from httpx import AsyncClient
 
-from tests.integration.test_data import IntegrationTestUsers
-
 
 # ============================================================================
 # POSITIVE TESTS - Successful Authorization
@@ -24,42 +22,38 @@ from tests.integration.test_data import IntegrationTestUsers
 
 @pytest.mark.asyncio
 async def test_authorize_success_with_valid_token_and_session(
-    api_client: AsyncClient, admin_actor: dict
+    api_client: AsyncClient, admin_actor
 ):
-    """Test successful authorization with valid JWT + session_id + admin role.
+    """Test successful authorization with valid JWT + admin role.
 
     Admin makes an admin-level request (create user) with valid credentials.
     Should succeed with 201 Created.
     """
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "authorized_user",
+            "password": "auth_pass_123",
+            "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
     )
 
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == user_data.username
+    assert data["username"] == "authorized_user"
 
 
 @pytest.mark.asyncio
-async def test_authorize_success_user_role(api_client: AsyncClient, user_actor: dict):
+async def test_authorize_success_user_role(api_client: AsyncClient, user_actor):
     """Test successful authorization for user-level action.
 
-    Regular user with valid JWT + session_id can perform user-level actions.
+    Regular user with valid JWT can perform user-level actions.
     For now, we test that user can login (which is implicitly authorized).
     """
-    # User actor is already logged in (fixture creates JWT + session)
+    # User actor is already logged in (fixture creates JWT)
     # Just verify that user has valid credentials
-    assert user_actor["headers"]["Authorization"].startswith("Bearer ")
-    assert user_actor["cookies"]["session_id"] is not None
+    assert user_actor.headers["Authorization"].startswith("Bearer ")
 
 
 # ============================================================================
@@ -70,14 +64,12 @@ async def test_authorize_success_user_role(api_client: AsyncClient, user_actor: 
 @pytest.mark.asyncio
 async def test_authorize_missing_token(api_client: AsyncClient):
     """Test authorization fails when Authorization header is missing."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "no_token_user",
+            "password": "no_token_pass",
+            "role": "user",
         },
         # No Authorization header
     )
@@ -86,19 +78,16 @@ async def test_authorize_missing_token(api_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_authorize_invalid_token_format(api_client: AsyncClient, admin_actor: dict):
+async def test_authorize_invalid_token_format(api_client: AsyncClient):
     """Test authorization fails with invalid token format."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "invalid_token_user",
+            "password": "invalid_token_pass",
+            "role": "user",
         },
         headers={"Authorization": "Bearer invalid_token_format"},
-        cookies=admin_actor["cookies"],  # Valid session but invalid token
     )
 
     assert response.status_code == 401
@@ -117,24 +106,21 @@ async def test_authorize_expired_token(api_client: AsyncClient):
 
     expired_payload = {
         "sub": "test_user",
-        "session_id": "00000000-0000-0000-0000-000000000000",
+        "sid": "00000000-0000-0000-0000-000000000000",
         "exp": datetime.now(timezone.utc) - timedelta(hours=1),
     }
 
     # Use test secret (should match .env.test)
     expired_token = jwt.encode(expired_payload, "test-secret-key-for-integration-tests", algorithm="HS256")
 
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "expired_token_user",
+            "password": "expired_token_pass",
+            "role": "user",
         },
         headers={"Authorization": f"Bearer {expired_token}"},
-        cookies={"session_id": "00000000-0000-0000-0000-000000000000"},
     )
 
     assert response.status_code == 401
@@ -143,14 +129,12 @@ async def test_authorize_expired_token(api_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_authorize_malformed_token(api_client: AsyncClient):
     """Test authorization fails with malformed Authorization header."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "malformed_token_user",
+            "password": "malformed_token_pass",
+            "role": "user",
         },
         headers={"Authorization": "malformed_no_bearer"},
     )
@@ -164,44 +148,32 @@ async def test_authorize_malformed_token(api_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_authorize_missing_session_cookie(api_client: AsyncClient, admin_actor: dict):
-    """Test authorization fails when session_id cookie is missing.
-
-    Valid JWT but no session_id cookie should fail.
-    """
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
-    response = await api_client.post(
-        "/users",
-        json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
-        },
-        headers=admin_actor["headers"],  # Valid JWT
-        # No cookies - missing session_id
-    )
-
-    assert response.status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_authorize_invalid_session_id(api_client: AsyncClient, admin_actor: dict):
+async def test_authorize_invalid_session_id(api_client: AsyncClient, admin_actor):
     """Test authorization fails when session_id doesn't exist in DB.
 
-    Valid JWT but non-existent session_id should fail.
+    Valid JWT signature but non-existent session_id in claims should fail.
     """
-    user_data = IntegrationTestUsers.USER_TO_CREATE
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    # Create JWT with non-existent session_id
+    invalid_payload = {
+        "sub": str(admin_actor.user_id),
+        "role": "admin",
+        "sid": "00000000-0000-0000-0000-000000000000",  # Non-existent
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+
+    invalid_token = jwt.encode(invalid_payload, "test-secret-key-for-integration-tests", algorithm="HS256")
 
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "invalid_session_user",
+            "password": "invalid_session_pass",
+            "role": "user",
         },
-        headers=admin_actor["headers"],  # Valid JWT
-        cookies={"session_id": "00000000-0000-0000-0000-000000000000"},  # Non-existent
+        headers={"Authorization": f"Bearer {invalid_token}"},
     )
 
     assert response.status_code == 401
@@ -209,23 +181,20 @@ async def test_authorize_invalid_session_id(api_client: AsyncClient, admin_actor
 
 @pytest.mark.asyncio
 async def test_authorize_revoked_session(
-    api_client: AsyncClient, user_with_revoked_session: dict
+    api_client: AsyncClient, user_with_revoked_session
 ):
     """Test authorization fails when session is revoked.
 
     Valid JWT but session has revoked_at timestamp should fail.
     """
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
+            "username": "revoked_session_user",
+            "password": "revoked_session_pass",
             "role": "admin",  # Try to create user (requires ADMIN)
         },
-        headers=user_with_revoked_session["headers"],  # Valid JWT
-        cookies=user_with_revoked_session["cookies"],  # Revoked session
+        headers=user_with_revoked_session.headers,  # Valid JWT with revoked session
     )
 
     assert response.status_code == 401
@@ -238,24 +207,21 @@ async def test_authorize_revoked_session(
 
 @pytest.mark.asyncio
 async def test_authorize_insufficient_role_user_tries_admin_action(
-    api_client: AsyncClient, user_actor: dict
+    api_client: AsyncClient, user_actor
 ):
     """Test authorization fails when user has insufficient role.
 
     Regular USER tries to create a user (requires ADMIN role).
     Should fail with 403 Forbidden.
     """
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "insufficient_user",
+            "password": "insufficient_pass",
+            "role": "user",
         },
-        headers=user_actor["headers"],  # Valid JWT but USER role
-        cookies=user_actor["cookies"],  # Valid session
+        headers=user_actor.headers,  # Valid JWT but USER role
     )
 
     assert response.status_code == 403
@@ -263,7 +229,7 @@ async def test_authorize_insufficient_role_user_tries_admin_action(
 
 
 @pytest.mark.asyncio
-async def test_authorize_missing_form_fields(api_client: AsyncClient, admin_actor: dict):
+async def test_authorize_missing_form_fields(api_client: AsyncClient, admin_actor):
     """Test that missing required fields returns validation error, not auth error.
 
     This is technically a validation test, but included here to verify
@@ -274,8 +240,7 @@ async def test_authorize_missing_form_fields(api_client: AsyncClient, admin_acto
         json={
             # Missing username, password, role
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
     )
 
     # Should return 422 Unprocessable Entity (validation error), not 401/403
