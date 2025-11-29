@@ -12,6 +12,7 @@ from app.application.ports.uow import UnitOfWork
 from app.domain.entities.base import Repository
 from app.domain.entities.user.repo import UserRepository
 from app.infrastructure.db.sqlalchemy.adapters.repo import UserRepositorySQL
+from app.infrastructure.db.sqlalchemy.user_session_repo import UserSessionORMRepo
 
 type RepoFactory[R: Repository] = Callable[[AsyncSession], R]
 
@@ -24,6 +25,7 @@ class UoWSQL(UnitOfWork):
 
     _REGISTRY: ClassVar[dict[Repository, RepoFactory[Repository]]] = {
         UserRepository: lambda s: UserRepositorySQL(s),
+        UserSessionORMRepo: lambda s: UserSessionORMRepo(s),
     }
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:

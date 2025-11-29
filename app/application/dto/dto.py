@@ -28,3 +28,20 @@ class AuthResponseDTO(DTO):
     user_id: str
     username: str
     role: str
+
+
+@dataclass(slots=True, frozen=True)
+class GetAllUsersInputDTO(DTO): ...
+
+
+@dataclass(slots=True, frozen=True)
+class UserDTO(DTO):
+    id: str
+    username: str
+    role: str
+    is_active: bool
+
+
+@dataclass(slots=True, frozen=True)
+class GetAllUsersOutputDTO(DTO):
+    users: list[UserDTO]

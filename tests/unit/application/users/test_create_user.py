@@ -42,8 +42,8 @@ async def test_create_user_success(
     async with uow_factory() as uow:
         uow: UnitOfWork
         repo = uow.get_repo(UserRepository)
-        new_user = repo.get_by_username(Username(dto.username))
-    
+        new_user = await repo.get_by_username(Username(dto.username))
+
     assert new_user is not None
 
 
@@ -103,7 +103,7 @@ async def test_create_user_validation_error(
     
     await use_case.execute(dto, presenter)
     
-    assert presenter.state == State.ERROR
+    assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
     assert "User with provided parameters cannot be created" in presenter.response
 
@@ -133,7 +133,7 @@ async def test_create_user_invalid_role(
     
     await use_case.execute(dto, presenter)
     
-    assert presenter.state == State.ERROR
+    assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
     assert "User with provided parameters cannot be created" in presenter.response
 
@@ -163,6 +163,6 @@ async def test_create_user_empty_password(
     
     await use_case.execute(dto, presenter)
     
-    assert presenter.state == State.ERROR
+    assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
     assert "User with provided parameters cannot be created" in presenter.response

@@ -29,3 +29,14 @@ class CreateUserResponse(BaseModel):
     id: str
     username: str = Field(..., min_length=USERNAME_MIN_LEN, max_length=USERNAME_MAX_LEN)
     role: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: str = Field(..., min_length=USERNAME_MIN_LEN, max_length=USERNAME_MAX_LEN)
+    role: str
+    is_active: bool
+
+
+class GetAllUsersResponse(BaseModel):
+    users: list[UserResponse]

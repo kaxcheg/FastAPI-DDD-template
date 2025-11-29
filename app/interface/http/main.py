@@ -16,30 +16,39 @@ from app.infrastructure.security.jwt_service import (
     JwtTokenInvalid,
     JwtTokenService,
 )
-from app.interface.http.routes import login, users
+from app.interface.http.routes import auth, users
 from app.interface.http.routes.dependencies import get_jwt_service
+from app.interface.http.schemas import ErrorResponse
 
-logger = get_logger(__name__)  # Reuse module-level logger.
+logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application instance."""
 
     app = FastAPI(title="dddapitpl")
-    app.include_router(users.router, prefix="/users", tags=["Users"])
-    app.include_router(login.router, prefix="/auth", tags=["Authentication"])
+    app.include_router(
+        users.router, 
+        prefix="/users", 
+        tags=["Users"], 
+        responses={
+            401: {"description": "Unauthorized", "model": ErrorResponse},
+            403: {"description": "Forbidden", "model": ErrorResponse}
+        },
+    )
+    app.include_router(
+        auth.router, 
+        prefix="/auth", 
+        tags=["Authentication"],
+        responses={
+            401: {"description": "Unauthorized", "model": ErrorResponse},
+        },
+    )
+
     return app
 
 
 app = create_app()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],  # Swagger UI
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 def custom_openapi():
     if app.openapi_schema:
@@ -107,10 +116,9 @@ async def check_user_auth_middleware(
     ):
         return await call_next(request)
 
-    sid_cookie = request.cookies.get("session_id")
     auth_header = request.headers.get("Authorization", "")
 
-    if sid_cookie and auth_header.startswith("Bearer "):
+    if auth_header.startswith("Bearer "):
         token_service: JwtTokenService = get_jwt_service()
         try:
             token = token_service.decode(auth_header[len("Bearer ") :])
@@ -128,7 +136,6 @@ async def check_user_auth_middleware(
             and isinstance(user_id, str)
             and sid
             and isinstance(sid, str)
-            and sid == sid_cookie
             and user_role
             and isinstance(user_role, str)
         ):

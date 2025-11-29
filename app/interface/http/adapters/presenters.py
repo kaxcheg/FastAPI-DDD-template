@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO
+from app.application.dto.base import DTO
 from app.application.ports import AuthPresenter
 from app.application.ports.presenters import Presenter
 
 
-class FastAPICreateUserPresenter(AuthPresenter[CreateUserOutputDTO]):
-    """Presenter for create-user responses."""
+class FastAPIPresenter[D: DTO](Presenter[D]):
+    """Generic FastAPI presenter."""
 
 
-class FastAPIAuthenticationPresenter(Presenter[AuthResponseDTO]):
-    """Presenter for authentication responses."""
+class FastAPIAuthPresenter[D: DTO](AuthPresenter[D]):
+    """Generic FastAPI auth presenter."""

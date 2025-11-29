@@ -9,7 +9,6 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
-from tests.integration.test_data import IntegrationTestUsers
 
 
 # ============================================================================
@@ -18,25 +17,23 @@ from tests.integration.test_data import IntegrationTestUsers
 
 
 @pytest.mark.asyncio
-async def test_create_user_success_as_admin(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_success_as_admin(api_client: AsyncClient, admin_actor):
     """Test admin can successfully create a new user."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "new_user",
+            "password": "secure_pass_123",
+            "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == user_data.username
-    assert data["role"] == user_data.role
+    assert data["username"] == "new_user"
+    assert data["role"] == "user"
     assert "id" in data
 
     # Verify user exists in DB
@@ -44,35 +41,33 @@ async def test_create_user_success_as_admin(api_client: AsyncClient, admin_actor
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        stmt = select(UserORM).where(UserORM.username == user_data.username)
+        stmt = select(UserORM).where(UserORM.username == "new_user")
         result = await session.execute(stmt)
         new_user = result.scalar_one_or_none()
 
         assert new_user is not None
-        assert new_user.username == user_data.username
-        assert new_user.role == user_data.role
+        assert new_user.username == "new_user"
+        assert new_user.role == "user"
         assert new_user.is_active is True
 
 
 @pytest.mark.asyncio
-async def test_create_admin_user_success_as_admin(api_client: AsyncClient, admin_actor: dict):
+async def test_create_admin_user_success_as_admin(api_client: AsyncClient, admin_actor):
     """Test admin can create another admin user."""
-    user_data = IntegrationTestUsers.ADMIN_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "new_admin",
+            "password": "admin_pass_123",
+            "role": "admin",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == user_data.username
+    assert data["username"] == "new_admin"
     assert data["role"] == "admin"
 
     # Verify in DB
@@ -80,7 +75,7 @@ async def test_create_admin_user_success_as_admin(api_client: AsyncClient, admin
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        stmt = select(UserORM).where(UserORM.username == user_data.username)
+        stmt = select(UserORM).where(UserORM.username == "new_admin")
         result = await session.execute(stmt)
         new_admin = result.scalar_one_or_none()
 
@@ -96,18 +91,18 @@ async def test_create_admin_user_success_as_admin(api_client: AsyncClient, admin
 
 @pytest.mark.asyncio
 async def test_create_user_duplicate_username_conflict(
-    api_client: AsyncClient, admin_actor: dict, user_to_authenticate: UserORM
+    api_client: AsyncClient, admin_actor
 ):
     """Test creating user with existing username returns conflict."""
     response = await api_client.post(
         "/users",
         json={
-            "username": user_to_authenticate.username,  # Already exists
+            "username": admin_actor.username,  # Already exists
             "password": "password123",
             "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 409
@@ -120,7 +115,7 @@ async def test_create_user_duplicate_username_conflict(
 
 
 @pytest.mark.asyncio
-async def test_create_user_invalid_username(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_invalid_username(api_client: AsyncClient, admin_actor):
     """Test creating user with invalid username fails."""
     response = await api_client.post(
         "/users",
@@ -129,15 +124,15 @@ async def test_create_user_invalid_username(api_client: AsyncClient, admin_actor
             "password": "password123",
             "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 422  # FastAPI validation error
 
 
 @pytest.mark.asyncio
-async def test_create_user_invalid_password(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_invalid_password(api_client: AsyncClient, admin_actor):
     """Test creating user with invalid password fails."""
     response = await api_client.post(
         "/users",
@@ -146,15 +141,15 @@ async def test_create_user_invalid_password(api_client: AsyncClient, admin_actor
             "password": "",  # Empty password
             "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 422  # FastAPI validation error
 
 
 @pytest.mark.asyncio
-async def test_create_user_invalid_role(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_invalid_role(api_client: AsyncClient, admin_actor):
     """Test creating user with invalid role fails."""
     response = await api_client.post(
         "/users",
@@ -163,23 +158,23 @@ async def test_create_user_invalid_role(api_client: AsyncClient, admin_actor: di
             "password": "password123",
             "role": "INVALID_ROLE",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 422  # FastAPI validation error
 
 
 @pytest.mark.asyncio
-async def test_create_user_missing_required_fields(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_missing_required_fields(api_client: AsyncClient, admin_actor):
     """Test creating user with missing fields fails."""
     response = await api_client.post(
         "/users",
         json={
             # Missing username, password, role
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 422  # FastAPI validation error
@@ -191,7 +186,7 @@ async def test_create_user_missing_required_fields(api_client: AsyncClient, admi
 
 
 @pytest.mark.asyncio
-async def test_create_user_password_is_hashed(api_client: AsyncClient, admin_actor: dict):
+async def test_create_user_password_is_hashed(api_client: AsyncClient, admin_actor):
     """Test that user password is properly hashed in database."""
     plain_password = "secure_pass_123"  # Max 20 chars
 
@@ -202,8 +197,8 @@ async def test_create_user_password_is_hashed(api_client: AsyncClient, admin_act
             "password": plain_password,
             "role": "user",
         },
-        headers=admin_actor["headers"],
-        cookies=admin_actor["cookies"],
+        headers=admin_actor.headers,
+        cookies=admin_actor.cookies,
     )
 
     assert response.status_code == 201
@@ -230,20 +225,18 @@ async def test_create_user_password_is_hashed(api_client: AsyncClient, admin_act
 
 @pytest.mark.asyncio
 async def test_create_user_as_regular_user_forbidden(
-    api_client: AsyncClient, user_actor: dict
+    api_client: AsyncClient, user_actor
 ):
     """Test regular user cannot create users (requires ADMIN role)."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "forbidden_user",
+            "password": "forbidden_pass_123",
+            "role": "user",
         },
-        headers=user_actor["headers"],
-        cookies=user_actor["cookies"],
+        headers=user_actor.headers,
+        cookies=user_actor.cookies,
     )
 
     assert response.status_code == 403
@@ -253,14 +246,12 @@ async def test_create_user_as_regular_user_forbidden(
 @pytest.mark.asyncio
 async def test_create_user_without_auth_unauthorized(api_client: AsyncClient):
     """Test creating user without authentication returns 401."""
-    user_data = IntegrationTestUsers.USER_TO_CREATE
-
     response = await api_client.post(
         "/users",
         json={
-            "username": user_data.username,
-            "password": user_data.raw_password,
-            "role": user_data.role,
+            "username": "unauth_user",
+            "password": "unauth_pass_123",
+            "role": "user",
         },
     )
 

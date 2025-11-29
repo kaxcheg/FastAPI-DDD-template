@@ -37,3 +37,11 @@ class UserRepository(Repository):
             user: User domain entity.
         """
         ...
+
+    async def get_all(self) -> list[User]:
+        """Return all users.
+
+        Returns:
+            list[User]: List of all user entities.
+        """
+        ...
