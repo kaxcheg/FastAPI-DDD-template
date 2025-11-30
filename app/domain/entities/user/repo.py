@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from  abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 
 from app.domain.entities.base import Repository
 from app.domain.entities.user import User
