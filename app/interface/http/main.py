@@ -5,7 +5,6 @@ from typing import Awaitable, Callable, Final
 from uuid import UUID
 
 from fastapi import FastAPI, Request, Response, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
@@ -28,17 +27,17 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="dddapitpl")
     app.include_router(
-        users.router, 
-        prefix="/users", 
-        tags=["Users"], 
+        users.router,
+        prefix="/users",
+        tags=["Users"],
         responses={
             401: {"description": "Unauthorized", "model": ErrorResponse},
-            403: {"description": "Forbidden", "model": ErrorResponse}
+            403: {"description": "Forbidden", "model": ErrorResponse},
         },
     )
     app.include_router(
-        auth.router, 
-        prefix="/auth", 
+        auth.router,
+        prefix="/auth",
         tags=["Authentication"],
         responses={
             401: {"description": "Unauthorized", "model": ErrorResponse},
@@ -49,6 +48,7 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
 
 def custom_openapi():
     if app.openapi_schema:

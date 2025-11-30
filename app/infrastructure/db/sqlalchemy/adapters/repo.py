@@ -4,12 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.exceptions import DuplicateUserError
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
-
-from app.application.exceptions import DuplicateUserError
-
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 
 

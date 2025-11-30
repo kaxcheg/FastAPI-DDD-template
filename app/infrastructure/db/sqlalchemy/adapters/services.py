@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import override, Callable
+from typing import Callable, override
 from uuid import UUID
 
 from app.application.exceptions import NotAuthenticatedError, NotAuthorizedError
@@ -47,8 +47,8 @@ class TokenSessionAuthService(AuthService):
         async with self._uow_factory() as uow:
             user_session_repo = uow.get_repo(UserSessionORMRepo)
             user_orm = await user_session_repo.get_user_if_session_valid(
-            self._payload.user_id, self._payload.session_id
-        )
+                self._payload.user_id, self._payload.session_id
+            )
         if user_orm is None or user_orm.role != self._payload.role:
             raise NotAuthenticatedError("Unauthorized")
 
