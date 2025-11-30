@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select,delete, or_
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
@@ -33,21 +33,24 @@ class UserSessionORMRepo:
 
     async def get_session_by_id(self, session_id: UUID) -> UserSessionORM | None:
         return await self._s.get(UserSessionORM, session_id)
-        
-    async def create(self, user_id: UUID, expiry_time: int, max_sessions: int) -> UserSessionORM:
+
+    async def create(
+        self, user_id: UUID, expiry_time: int, max_sessions: int
+    ) -> UserSessionORM:
         existing = await self._s.execute(
-        select(UserSessionORM)
-        .where(UserSessionORM.user_id == user_id, UserSessionORM.revoked_at.is_(None))
-        .order_by(UserSessionORM.expires_at.desc())
-        .offset(max_sessions - 1)
-    )
+            select(UserSessionORM)
+            .where(
+                UserSessionORM.user_id == user_id, UserSessionORM.revoked_at.is_(None)
+            )
+            .order_by(UserSessionORM.expires_at.desc())
+            .offset(max_sessions - 1)
+        )
         for old_session in existing.scalars():
             old_session.revoked_at = datetime.now(timezone.utc)
-        
+
         user_session = UserSessionORM(
             user_id=user_id,
-            expires_at=timedelta(minutes=expiry_time)
-            + datetime.now(timezone.utc),
+            expires_at=timedelta(minutes=expiry_time) + datetime.now(timezone.utc),
         )
         self._s.add(user_session)
         await self._s.flush()
@@ -61,14 +64,13 @@ class UserSessionORMRepo:
             user_session.revoked_at = datetime.now(timezone.utc)
             return True
         return False
-    
-    
+
     async def delete_expired(self) -> int:
         result = await self._s.execute(
             delete(UserSessionORM).where(
                 or_(
                     UserSessionORM.expires_at < datetime.now(timezone.utc),
-                    UserSessionORM.revoked_at.isnot(None)
+                    UserSessionORM.revoked_at.isnot(None),
                 )
             )
         )

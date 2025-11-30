@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.application.dto import AuthRequestDTO, AuthResponseDTO
-from app.application.ports.uow import UnitOfWork
 from app.application.ports.presenters import State
+from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.config import get_settings
 from app.config.logging import get_logger
@@ -17,7 +17,7 @@ from app.interface.http.adapters.presenters import FastAPIPresenter
 from app.interface.http.routes.dependencies import (
     get_authenticate_user_uc,
     get_jwt_service,
-    get_uow_factory
+    get_uow_factory,
 )
 from app.interface.http.schemas import ErrorResponse, Token
 from app.interface.http.utils import raise_for_presenter_400_state
@@ -60,9 +60,9 @@ async def login(
         async with uow_factory() as uow:
             user_session_repo = uow.get_repo(UserSessionORMRepo)
             user_session = await user_session_repo.create(
-                user_id=UUID(user_id), 
+                user_id=UUID(user_id),
                 expiry_time=cfg.SESSION_EXPIRY_TIME,
-                max_sessions=cfg.MAX_CONCURRENT_SESSIONS
+                max_sessions=cfg.MAX_CONCURRENT_SESSIONS,
             )
             token = token_service.issue(
                 claims={
@@ -88,10 +88,7 @@ async def login(
         raise ValueError("Wrong presenter response type")
 
 
-@router.post(
-    "/logout",
-    status_code=204
-)
+@router.post("/logout", status_code=204)
 async def logout(
     request: Request,
     uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
@@ -103,10 +100,11 @@ async def logout(
         user_session_repo = uow.get_repo(UserSessionORMRepo)
         revoked = await user_session_repo.revoke(auth.session_id)
 
-    if revoked: 
-        logger.info({
-            "event": "logout", 
-            "user_id": str(auth.user_id),
-            "session_id": str(auth.session_id)
-        })
-        
+    if revoked:
+        logger.info(
+            {
+                "event": "logout",
+                "user_id": str(auth.user_id),
+                "session_id": str(auth.session_id),
+            }
+        )

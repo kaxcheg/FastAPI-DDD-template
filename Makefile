@@ -176,36 +176,36 @@ lint:
 
 	@echo "Running black"
 	@if command -v black >/dev/null 2>&1; then \
-		black --check $(APP_DIR) || true; \
+		black --check $(APP_DIR); \
 	elif command -v poetry >/dev/null 2>&1; then \
-		poetry run black --check $(APP_DIR) || true; \
+		poetry run black --check $(APP_DIR); \
 	else \
 		echo "black not installed, skipping"; \
 	fi
 
 	@echo "Running ruff"
 	@if command -v ruff >/dev/null 2>&1; then \
-		ruff check $(APP_DIR) || true; \
+		ruff check $(APP_DIR); \
 	elif command -v poetry >/dev/null 2>&1; then \
-		poetry run ruff check $(APP_DIR) || true; \
+		poetry run ruff check $(APP_DIR); \
 	else \
 		echo "ruff not installed, skipping"; \
 	fi
 
 	@echo "Running isort"
 	@if command -v isort >/dev/null 2>&1; then \
-		isort --check $(APP_DIR) || true; \
+		isort --check $(APP_DIR); \
 	elif command -v poetry >/dev/null 2>&1; then \
-		poetry run isort --check $(APP_DIR) || true; \
+		poetry run isort --check $(APP_DIR); \
 	else \
 		echo "isort not installed, skipping"; \
 	fi
 
 	@echo "Running mypy"
 	@if command -v mypy >/dev/null 2>&1; then \
-		mypy $(APP_DIR) || true; \
+		mypy $(APP_DIR); \
 	elif command -v poetry >/dev/null 2>&1; then \
-		poetry run mypy $(APP_DIR) || true; \
+		poetry run mypy $(APP_DIR); \
 	else \
 		echo "mypy not installed, skipping"; \
 	fi

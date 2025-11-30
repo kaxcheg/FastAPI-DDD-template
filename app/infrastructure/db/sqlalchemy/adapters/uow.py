@@ -23,7 +23,7 @@ R = TypeVar("R", bound=Repository)
 class UoWSQL(UnitOfWork):
     """Unit-of-Work adapter for async SQLAlchemy."""
 
-    _REGISTRY: ClassVar[dict[Repository, RepoFactory[Repository]]] = {
+    _REGISTRY: ClassVar[dict[type[Repository], RepoFactory[Repository]]] = {
         UserRepository: lambda s: UserRepositorySQL(s),
         UserSessionORMRepo: lambda s: UserSessionORMRepo(s),
     }

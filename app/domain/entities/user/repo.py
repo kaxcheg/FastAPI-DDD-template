@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from  abc import ABC, abstractmethod
+
 from app.domain.entities.base import Repository
 from app.domain.entities.user import User
 from app.domain.value_objects import UserId, Username
 
 
-class UserRepository(Repository):
+class UserRepository(ABC, Repository):
     """Repository contract for user entities."""
 
+    @abstractmethod
     async def get_by_username(self, username: Username) -> User | None:
         """Return user by username.
 
@@ -19,6 +22,7 @@ class UserRepository(Repository):
         """
         ...
 
+    @abstractmethod
     async def get_by_id(self, user_id: UserId) -> User | None:
         """Return user by identifier.
 
@@ -30,6 +34,7 @@ class UserRepository(Repository):
         """
         ...
 
+    @abstractmethod
     async def add(self, user: User) -> None:
         """Persist user.
 
@@ -38,6 +43,7 @@ class UserRepository(Repository):
         """
         ...
 
+    @abstractmethod
     async def get_all(self) -> list[User]:
         """Return all users.
 

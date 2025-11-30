@@ -11,7 +11,6 @@ from app.application.use_cases.base import AuthorizeUserUseCase
 from app.config.logging import get_logger
 from app.domain.entities.user.repo import UserRepository
 from app.domain.entities.user.user import User
-from app.domain.exceptions import ValueObjectError
 from app.domain.exceptions.base import DomainError
 from app.domain.ports.services import IdGenerator
 from app.domain.value_objects import Username, UserRawPassword, UserRole
@@ -56,7 +55,9 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
                 id_gen=self._id_gen,
             )
         except (DomainError, ValueError) as e:
-            presenter.domain_error(f"User with provided parameters cannot be created: {e}")
+            presenter.domain_error(
+                f"User with provided parameters cannot be created: {e}"
+            )
             return
 
         try:

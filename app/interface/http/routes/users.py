@@ -18,12 +18,13 @@ from app.interface.http.schemas import (
     CreateUserRequest,
     CreateUserResponse,
     ErrorResponse,
-    UserResponse,
     GetAllUsersResponse,
+    UserResponse,
 )
 from app.interface.http.utils import raise_for_presenter_400_state
 
 router = APIRouter()
+
 
 @router.get("", status_code=status.HTTP_200_OK, response_model=GetAllUsersResponse)
 async def get_all_users(
