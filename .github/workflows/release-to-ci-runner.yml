@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build_and_push:
-    uses: ./.github/workflows/ci-push-to-ecr.yml
+    uses: ./.github/workflows/ci-push-to-ghcr.yml
     secrets: inherit
 
   deploy_ci_runner:

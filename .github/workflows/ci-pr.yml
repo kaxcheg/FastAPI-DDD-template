@@ -19,7 +19,7 @@ jobs:
     with:
       python-version: "3.12"
   
-  build-and-integration-tests:
+  build-and-e2e-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
