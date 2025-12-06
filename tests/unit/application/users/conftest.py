@@ -9,7 +9,6 @@ from tests.adapters import (
     TestUser, 
     FakeUoW, 
     FakePasswordVerifier, 
-    FakeAuthService,
     FakePasswordHasher,
     FakeIdGenerator
 )
@@ -68,6 +67,6 @@ def id_generator():
     """ID generator fixture."""
     return FakeIdGenerator()
 
-@pytest.fixture(scope="session")
-def successful_auth_service():
-    return FakeAuthService(is_user_found=True, is_role_ensured=True)
+# @pytest.fixture(scope="session")
+# def successful_auth_service():
+#     return FakeAuthService(is_user_found=True, is_role_ensured=True)
