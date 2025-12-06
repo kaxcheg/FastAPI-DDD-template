@@ -19,6 +19,8 @@ from app.domain.value_objects import Username, UserRawPassword, UserRole
 class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutputDTO]):
     """Use case for creating new users (admin-only)."""
 
+    _required_roles: list[UserRole] = [UserRole.ADMIN]
+
     logger = get_logger(__name__)
 
     @override
@@ -30,10 +32,7 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
         id_gen: IdGenerator,
     ) -> None:
         """Initialize with dependencies."""
-        super().__init__(
-            auth_service=auth_service,
-            required_role=UserRole.ADMIN,
-        )
+        super().__init__(auth_service=auth_service)
         self._uow_factory = uow_factory
         self._hasher = hasher
         self._id_gen = id_gen
@@ -55,9 +54,7 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
                 id_gen=self._id_gen,
             )
         except (DomainError, ValueError) as e:
-            presenter.domain_error(
-                f"User with provided parameters cannot be created: {e}"
-            )
+            presenter.domain_error(f"User cannot be created: {e}")
             return
 
         try:

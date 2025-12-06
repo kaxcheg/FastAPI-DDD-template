@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable
 
 from app.domain.entities.user import User
-from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, UserRole
+from app.domain.value_objects import UserPasswordHash, UserRawPassword
 
 
 @runtime_checkable
@@ -28,11 +28,3 @@ class AuthService(ABC):
 
     @abstractmethod
     async def current_user(self) -> User: ...
-
-    @abstractmethod
-    def ensure_role(
-        self,
-        user_id: UserId,
-        user_role: UserRole,
-        required_role: UserRole,
-    ) -> None: ...

@@ -24,7 +24,7 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
     """Use case base that checks authentication and role before execution."""
 
     _auth: AuthService
-    _required_role: UserRole
+    _required_roles: list[UserRole]
     _uow_factory: Callable[[], UnitOfWork]
 
     logger: Logger = get_logger(__name__)
@@ -32,11 +32,15 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
     def __init__(
         self,
         auth_service: AuthService,
-        required_role: UserRole,
     ) -> None:
         """Initialize with UoW factory, auth service and target role."""
         self._auth = auth_service
-        self._required_role = required_role
+        self._required_role = self._required_roles
+
+    @staticmethod
+    def check_role(target_role: UserRole, required_roles: list[UserRole]) -> None:
+        if target_role not in required_roles:
+            raise NotAuthorizedError("Target role not in required roles.")
 
     @final
     async def execute(self, dto: I, presenter: AuthPresenter[O]) -> None:
@@ -51,7 +55,7 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
             presenter.unauthorized("Not authorized")
             return
         try:
-            self._auth.ensure_role(user.id, user.role, self._required_role)
+            self.check_role(user.role, self._required_roles)
         except NotAuthorizedError:
             presenter.forbidden("Forbidden")
             self.logger.warning(
