@@ -54,9 +54,7 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
                 id_gen=self._id_gen,
             )
         except (DomainError, ValueError) as e:
-            presenter.domain_error(
-                f"User cannot be created: {e}"
-            )
+            presenter.domain_error(f"User cannot be created: {e}")
             return
 
         try:

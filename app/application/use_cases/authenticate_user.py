@@ -9,8 +9,8 @@ from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import UseCase
 from app.config.logging import get_logger
 from app.domain.entities.user.repo import UserRepository
-from app.domain.exceptions.base import DomainError
 from app.domain.exceptions import ValueObjectError
+from app.domain.exceptions.base import DomainError
 from app.domain.value_objects import Username, UserRawPassword
 
 

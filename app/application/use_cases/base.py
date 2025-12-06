@@ -38,7 +38,7 @@ class AuthorizeUserUseCase[I: DTO, O: DTO](ABC):
         self._required_role = self._required_roles
 
     @staticmethod
-    def check_role(target_role:UserRole, required_roles:list[UserRole]) -> None:
+    def check_role(target_role: UserRole, required_roles: list[UserRole]) -> None:
         if target_role not in required_roles:
             raise NotAuthorizedError("Target role not in required roles.")
 

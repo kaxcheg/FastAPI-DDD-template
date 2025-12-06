@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable
 
 from app.domain.entities.user import User
-from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, UserRole
+from app.domain.value_objects import UserPasswordHash, UserRawPassword
 
 
 @runtime_checkable

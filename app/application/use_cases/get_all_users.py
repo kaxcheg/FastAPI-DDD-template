@@ -19,7 +19,6 @@ class GetAllUsersUseCase(
 
     _required_roles: list[UserRole] = [UserRole.ADMIN, UserRole.USER]
 
-
     logger = get_logger(__name__)
 
     @override
