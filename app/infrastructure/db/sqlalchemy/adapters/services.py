@@ -3,14 +3,13 @@ from dataclasses import dataclass
 from typing import Callable, override
 from uuid import UUID
 
-from app.application.exceptions import NotAuthenticatedError, NotAuthorizedError
+from app.application.exceptions import NotAuthenticatedError
 from app.application.ports.services import AuthService
 from app.application.ports.uow import UnitOfWork
 from app.domain.entities.user import User
 from app.domain.ports import IdGenerator
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
 from app.infrastructure.db.sqlalchemy.user_session_repo import UserSessionORMRepo
-from app.infrastructure.db.sqlalchemy.models.user import UserORM
 
 
 class UUIDv4Generator(IdGenerator):
