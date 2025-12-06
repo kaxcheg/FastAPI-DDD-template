@@ -27,7 +27,7 @@ class UserSessionORMRepo:
                 UserORM.id == user_id,
                 UserORM.is_active.is_(True),
                 UserSessionORM.id == session_id,
-                UserSessionORM.is_revoked.is_not(False),  # type: ignore[attr-defined]
+                UserSessionORM.is_revoked.is_(False),  # type: ignore[attr-defined]
             )
             .limit(1)
         )
@@ -55,7 +55,7 @@ class UserSessionORMRepo:
             .where(
                 UserORM.is_active.is_(True),
                 UserSessionORM.refresh_token_hash == refresh_token_hash,
-                UserSessionORM.is_revoked.is_not(False),  # type: ignore[attr-defined]
+                UserSessionORM.is_revoked.is_(False),  # type: ignore[attr-defined]
             )
             .limit(1)
         )
@@ -91,7 +91,7 @@ class UserSessionORMRepo:
             select(UserSessionORM)
             .where(
                 UserSessionORM.user_id == user_id,
-                UserSessionORM.is_revoked.is_not(False),  # type: ignore[attr-defined]
+                UserSessionORM.is_revoked.is_(False),  # type: ignore[attr-defined]
             )
             .order_by(UserSessionORM.expires_at.desc())
             .offset(max_sessions - 1)
