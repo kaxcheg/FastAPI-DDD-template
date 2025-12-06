@@ -15,12 +15,12 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  packages: read
   id-token: write
 
 env:
   NAMESPACE: ci-runner
   RELEASE: dddapitpl
-  AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
   deploy-ci-runner:
@@ -44,22 +44,16 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: kind
-          
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Create/Update ECR imagePullSecret
+      - name: Create/Update GHCR imagePullSecret
         run: |
-          kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
+          kubectl -n "$NAMESPACE" create secret docker-registry ghcr-pull \
             --docker-server=${{ inputs.registry }} \
-            --docker-username=AWS \
-            --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create/Update dddapitpl-secrets
@@ -99,7 +93,7 @@ jobs:
             -f deploy/helm/values-ci-runner.yaml \
             --set image.repository=${{ inputs.registry }}/${{ inputs.repo_path }} \
             --set image.digest=${{ inputs.digest }} \
-            --set image.pullSecrets[0]=ecr-pull \
+            --set image.pullSecrets[0]=ghcr-pull \
             --set-string api.version="$API_VERSION" \
             --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
 
