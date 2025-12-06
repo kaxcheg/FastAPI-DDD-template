@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Sequence
+from uuid import uuid4
 
 from jwt import ExpiredSignatureError, InvalidTokenError, decode, encode
 from pydantic import SecretStr
@@ -68,6 +69,11 @@ class JwtTokenService:
             str: Encoded JWT.
         """
         to_encode = dict(claims)
+
+        # Add issued-at timestamp and unique JWT ID for token uniqueness
+        now = self._clock()
+        to_encode["iat"] = int(now.timestamp())
+        to_encode["jti"] = str(uuid4())
 
         exp = self._compute_exp(expires_in)
         if exp is not None:

@@ -16,7 +16,9 @@ from app.infrastructure.security.jwt_service import (
     JwtTokenService,
 )
 from app.interface.http.routes import auth, users
-from app.interface.http.routes.dependencies import get_jwt_service
+from app.interface.http.routes.dependencies import (
+    get_access_token_service,
+)
 from app.interface.http.schemas import ErrorResponse
 
 logger = get_logger(__name__)
@@ -102,7 +104,14 @@ async def catch_unhandled_exceptions_middleware(
         )
 
 
-PUBLIC_PREFIXES = ("/docs", "/openapi.json", "/redoc", "/health", "/auth/login")
+PUBLIC_PREFIXES = (
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/health",
+    "/auth/login",
+    "/auth/refresh",
+)
 
 
 @app.middleware("http")
@@ -119,18 +128,18 @@ async def check_user_auth_middleware(
     auth_header = request.headers.get("Authorization", "")
 
     if auth_header.startswith("Bearer "):
-        token_service: JwtTokenService = get_jwt_service()
+        access_token_service: JwtTokenService = get_access_token_service()
         try:
-            token = token_service.decode(auth_header[len("Bearer ") :])
+            access_token = access_token_service.decode(auth_header[len("Bearer ") :])
         except (JwtTokenInvalid, JwtTokenExpired):
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"detail": "Not authorized."},
             )
 
-        user_id = token.get("sub")
-        sid = token.get("sid")
-        user_role = token.get("role")
+        user_id = access_token.get("sub")
+        sid = access_token.get("sid")
+        user_role = access_token.get("role")
         if (
             user_id
             and isinstance(user_id, str)
