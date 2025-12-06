@@ -10,6 +10,7 @@ from app.domain.entities.user import User
 from app.domain.ports import IdGenerator
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
 from app.infrastructure.db.sqlalchemy.user_session_repo import UserSessionORMRepo
+from app.infrastructure.db.sqlalchemy.models.user import UserORM
 
 
 class UUIDv4Generator(IdGenerator):
@@ -50,7 +51,7 @@ class TokenSessionAuthService(AuthService):
                 self._payload.user_id, self._payload.session_id
             )
         if user_orm is None or user_orm.role != self._payload.role:
-            raise NotAuthenticatedError("Unauthorized")
+            raise NotAuthenticatedError("Not authorized.")
 
         return User.from_storage(
             id=UserId(user_orm.id),
@@ -59,13 +60,3 @@ class TokenSessionAuthService(AuthService):
             role=UserRole(user_orm.role),
             is_active=user_orm.is_active,
         )
-
-    @override
-    def ensure_role(
-        self, user_id: UserId, user_role: UserRole, required_role: UserRole
-    ) -> None:
-        """Raise when role is insufficient."""
-        # Allow ADMIN and the exact target role.
-        if user_role in {UserRole.ADMIN, required_role}:
-            return
-        raise NotAuthorizedError("Forbidden")

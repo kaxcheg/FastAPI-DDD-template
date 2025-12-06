@@ -17,6 +17,9 @@ class GetAllUsersUseCase(
 ):
     """Use case for getting all users (admin-only)."""
 
+    _required_roles: list[UserRole] = [UserRole.ADMIN, UserRole.USER]
+
+
     logger = get_logger(__name__)
 
     @override
@@ -26,10 +29,7 @@ class GetAllUsersUseCase(
         uow_factory: Callable[[], UnitOfWork],
     ) -> None:
         """Initialize with dependencies."""
-        super().__init__(
-            auth_service=auth_service,
-            required_role=UserRole.USER,
-        )
+        super().__init__(auth_service=auth_service)
         self._uow_factory = uow_factory
 
     @override
@@ -43,14 +43,14 @@ class GetAllUsersUseCase(
             repo = uow.get_repo(UserRepository)
             users = await repo.get_all()
 
-        user_dtos = [
-            UserDTO(
-                id=str(user.id),
-                username=str(user.username),
-                role=str(user.role),
-                is_active=user.is_active,
-            )
-            for user in users
-        ]
+            user_dtos = [
+                UserDTO(
+                    id=str(user.id),
+                    username=str(user.username),
+                    role=str(user.role),
+                    is_active=user.is_active,
+                )
+                for user in users
+            ]
 
         presenter.ok(GetAllUsersOutputDTO(users=user_dtos))

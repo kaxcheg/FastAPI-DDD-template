@@ -28,11 +28,3 @@ class AuthService(ABC):
 
     @abstractmethod
     async def current_user(self) -> User: ...
-
-    @abstractmethod
-    def ensure_role(
-        self,
-        user_id: UserId,
-        user_role: UserRole,
-        required_role: UserRole,
-    ) -> None: ...

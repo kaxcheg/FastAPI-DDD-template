@@ -9,6 +9,7 @@ from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import UseCase
 from app.config.logging import get_logger
 from app.domain.entities.user.repo import UserRepository
+from app.domain.exceptions.base import DomainError
 from app.domain.exceptions import ValueObjectError
 from app.domain.value_objects import Username, UserRawPassword
 
@@ -38,7 +39,7 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
             async with self._uow_factory() as uow:
                 repo: UserRepository = uow.get_repo(UserRepository)
                 user = await repo.get_by_username(Username(dto.username))
-        except ValueObjectError:
+        except DomainError:
             presenter.unauthorized("Invalid credentials")
             self.logger.warning(
                 {"event": "auth_failed", "reason": "bad_username_format"}
@@ -51,7 +52,7 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
             return
 
         if not user.is_active:
-            presenter.unauthorized("Not authorized")
+            presenter.unauthorized("Invalid credentials")
             self.logger.warning({"event": "auth_failed", "reason": "inactive_user"})
             return
 
