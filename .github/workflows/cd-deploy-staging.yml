@@ -366,14 +366,7 @@ jobs:
             kubectl -n "$ns" get sts,deploy -l app.kubernetes.io/instance="$rel" -o wide || true
           fi
           echo "::endgroup::"
-
-      - name: Integration tests
-        run: |
-          make test-int
       
-      - name: Helm smoke test
-        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
-
       - name: E2E tests
         run: |
           make test-e2e

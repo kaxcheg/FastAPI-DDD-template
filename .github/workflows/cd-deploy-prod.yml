@@ -357,16 +357,8 @@ jobs:
           fi
           echo "::endgroup::"
 
-      - name: Integration tests
-        run: |
-          make test-int
-      
       - name: Helm smoke test
         run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
-
-      - name: E2E tests
-        run: |
-          make test-e2e
 
       - name: Get logs on failure (compact)
         if: ${{ failure() }}

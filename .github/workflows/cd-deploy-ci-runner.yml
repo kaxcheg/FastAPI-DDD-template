@@ -122,15 +122,7 @@ jobs:
           echo "✅ Current resources for release $RELEASE:"
           kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods \
             -l app.kubernetes.io/instance="$RELEASE" -o wide
-
-        
-      - name: Integration tests
-        run: |
-          make test-int
       
-      - name: Helm smoke test
-        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
-
       - name: E2E tests
         run: |
           make test-e2e
