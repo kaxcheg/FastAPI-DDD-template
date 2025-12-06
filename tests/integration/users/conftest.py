@@ -204,7 +204,7 @@ async def create_user_with_auth(
     user = UserORM(
         id=uuid4(),
         username=username,
-        password_hash=password_hasher.hash(UserRawPassword(password)).value,
+        password_hash=password_hasher.hash(UserRawPassword(value=password)).value,
         role=role,
         is_active=is_active,
     )
