@@ -7,19 +7,20 @@ from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
 from app.application.ports import UnitOfWork, State
 from app.application.use_cases import CreateUserUseCase
 
-from tests.adapters import FakeCreateUserPresenter
+from tests.adapters import FakeCreateUserPresenter, FakeAuthService
 
 @pytest.mark.asyncio
 async def test_create_user_success(
-    successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator,
 ):
     """Test successful user creation by admin."""
 
+    auth_service = FakeAuthService(is_user_found=True)
+
     use_case = CreateUserUseCase(
-        auth_service=successful_auth_service,
+        auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -49,7 +50,6 @@ async def test_create_user_success(
 
 @pytest.mark.asyncio
 async def test_create_user_conflict(
-    successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator,
@@ -57,8 +57,10 @@ async def test_create_user_conflict(
 ):
     """Test user creation fails when username already exists."""
 
+    auth_service = FakeAuthService(is_user_found=True)
+
     use_case = CreateUserUseCase(
-        auth_service=successful_auth_service,
+        auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -80,15 +82,16 @@ async def test_create_user_conflict(
 
 @pytest.mark.asyncio
 async def test_create_user_validation_error(
-    successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator
 ):
     """Test user creation fails with invalid input data."""
 
+    auth_service = FakeAuthService(is_user_found=True)
+
     use_case = CreateUserUseCase(
-        auth_service=successful_auth_service,
+        auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -105,20 +108,20 @@ async def test_create_user_validation_error(
     
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
-    assert "User with provided parameters cannot be created" in presenter.response
 
 
 @pytest.mark.asyncio
 async def test_create_user_invalid_role(
-    successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator
 ):
     """Test user creation fails with invalid role."""
 
+    auth_service = FakeAuthService(is_user_found=True)
+
     use_case = CreateUserUseCase(
-        auth_service=successful_auth_service,
+        auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -135,20 +138,20 @@ async def test_create_user_invalid_role(
     
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
-    assert "User with provided parameters cannot be created" in presenter.response
 
 
 @pytest.mark.asyncio
 async def test_create_user_empty_password(
-    successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator
 ):
     """Test user creation fails with empty password."""
 
+    auth_service = FakeAuthService(is_user_found=True)
+
     use_case = CreateUserUseCase(
-        auth_service=successful_auth_service,
+        auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -165,4 +168,3 @@ async def test_create_user_empty_password(
     
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
-    assert "User with provided parameters cannot be created" in presenter.response

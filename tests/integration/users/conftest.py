@@ -10,6 +10,12 @@ by testcontainer in the setup_test_database fixture.
 IMPORTANT: App modules are imported INSIDE fixtures to ensure
 env vars are set before any SQLAlchemy initialization occurs.
 
+COOKIE HANDLING IN TESTS:
+httpx AsyncClient with ASGITransport doesn't automatically persist cookies
+from Set-Cookie headers. Use extract_cookies_from_response() helper to
+manually extract cookies for use in subsequent requests.
+See: https://github.com/encode/httpx/discussions/2144
+
 Architecture (all function-scoped except infrastructure):
 - setup_test_database: session scope - creates PostgreSQL testcontainer once
 - init_db_schema: session scope - creates DB schema once
@@ -22,6 +28,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 from uuid import UUID, uuid4
 
+import httpx
 import jwt
 import pytest
 import pytest_asyncio
@@ -161,6 +168,7 @@ class TestUserData:
     password: str
     user_id: UUID
     username: str
+    role: str
     headers: dict | None = None
     cookies: dict | None = None
 
@@ -196,7 +204,7 @@ async def create_user_with_auth(
     user = UserORM(
         id=uuid4(),
         username=username,
-        password_hash=password_hasher.hash(UserRawPassword(password)).value,
+        password_hash=password_hasher.hash(UserRawPassword(value=password)).value,
         role=role,
         is_active=is_active,
     )
@@ -205,7 +213,6 @@ async def create_user_with_auth(
     await db_session.commit()  # Commit to make visible to API endpoints
 
     headers = None
-    cookies = None
 
     # Optionally create JWT + session via login
     if with_auth:
@@ -228,6 +235,7 @@ async def create_user_with_auth(
     return TestUserData(
         user=user,
         password=password,
+        role=role,
         user_id=user.id,
         username=user.username,
         headers=headers,
@@ -341,3 +349,46 @@ async def api_client() -> AsyncGenerator[AsyncClient, None]:
         transport=transport, base_url="http://test", follow_redirects=False
     ) as client:
         yield client
+
+
+def extract_cookies_from_response(response: httpx.Response) -> httpx.Cookies:
+    """Extract cookies from Set-Cookie header for ASGI testing.
+
+    httpx AsyncClient with ASGITransport doesn't automatically persist cookies
+    to the client's cookie jar, even though Set-Cookie headers are present.
+    This is a known limitation when testing ASGI applications.
+
+    This helper manually parses Set-Cookie headers to extract cookie values
+    for use in subsequent test requests.
+
+    References:
+    - https://github.com/encode/httpx/discussions/2144
+    - https://github.com/encode/httpx/discussions/2825
+
+    Args:
+        response: httpx Response object from AsyncClient
+
+    Returns:
+        httpx.Cookies object containing extracted cookies
+
+    Example:
+        login_response = await api_client.post("/auth/login", ...)
+        cookies = extract_cookies_from_response(login_response)
+        refresh_response = await api_client.post("/auth/refresh", cookies=cookies)
+    """
+    cookies = httpx.Cookies()
+
+    # Get all Set-Cookie headers (there may be multiple)
+    set_cookie_headers = response.headers.get_list("set-cookie")
+
+    for header_value in set_cookie_headers:
+        # Parse: "name=value; Path=/; HttpOnly; Secure; SameSite=lax"
+        # We only need the "name=value" part
+        cookie_parts = header_value.split(";")
+        if cookie_parts:
+            name_value = cookie_parts[0].strip()
+            if "=" in name_value:
+                name, value = name_value.split("=", 1)
+                cookies.set(name.strip(), value.strip())
+
+    return cookies

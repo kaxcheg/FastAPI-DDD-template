@@ -1,5 +1,5 @@
 from typing import TypeVar, Callable, ClassVar
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import Repository, UserRepository
@@ -11,7 +11,7 @@ from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUser
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
-from app.application.exceptions import DuplicateUserError, NotAuthenticatedError, NotAuthorizedError
+from app.application.exceptions import DuplicateUserError, NotAuthenticatedError
 
 @dataclass
 class TestUser:
@@ -131,15 +131,10 @@ class FakeUoW(UnitOfWork):
 class FakeAuthService(AuthService):
     """Test authentication service implementation."""
     
-    def __init__(self, is_role_ensured: bool, is_user_found: bool):
-        self.is_role_ensured = is_role_ensured
+    def __init__(self, is_user_found: bool, user_role:UserRole=UserRole.ADMIN):
+        self.user_role = user_role
         self.is_user_found = is_user_found
-        
-    def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole) -> None:
-        """Check if user has required role."""
-        if not self.is_role_ensured:
-            raise NotAuthorizedError(f"User role {user_role} does not match target role {required_role}")
-    
+
     async def current_user(self) -> User:
         """Get current authenticated user."""
         if not self.is_user_found:
@@ -149,7 +144,7 @@ class FakeAuthService(AuthService):
                 id=UserId.new(),
                 username=Username("stub_user"),
                 password_hash=UserPasswordHash(("x"*HASH_LEN).encode()),
-                role=UserRole(UserRole.USER)
+                role=UserRole.USER if self.user_role is UserRole.USER else UserRole.ADMIN
             )
 
         return user_stub

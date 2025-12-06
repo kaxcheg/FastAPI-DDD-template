@@ -10,14 +10,17 @@ from tests.adapters import FakeAuthService, FakeAuthorizationPresenter
 
 
 class TestAuthorizeUseCase(AuthorizeUserUseCase[DTO, DTO]):
+    _required_roles = [UserRole.ADMIN]
     async def run(self, dto: DTO, presenter: AuthPresenter[DTO]) -> None:
         presenter.ok(dto)
 
 @pytest.mark.asyncio
-async def test_authorize_success(uow_factory, successful_auth_service):
+async def test_authorize_success(uow_factory):
     """Test authentication fails with wrong password."""
     
-    uc = TestAuthorizeUseCase(successful_auth_service, UserRole.ADMIN)
+    auth_service = FakeAuthService(is_user_found=True)
+
+    uc = TestAuthorizeUseCase(auth_service)
 
     presenter = FakeAuthorizationPresenter()
     dto = DTO()
@@ -30,10 +33,9 @@ async def test_authorize_success(uow_factory, successful_auth_service):
 async def test_authorize_user_not_authenticated(uow_factory):
     """Test authorization fails when user is not authenticated."""
     auth_service = FakeAuthService(
-        is_role_ensured=True,
         is_user_found=False,
     )
-    uc = TestAuthorizeUseCase(auth_service, UserRole.USER)
+    uc = TestAuthorizeUseCase(auth_service)
     presenter = FakeAuthorizationPresenter()
     
     await uc.execute(DTO(), presenter)
@@ -46,11 +48,11 @@ async def test_authorize_insufficient_role(uow_factory):
     """Test authorization fails when user has insufficient role."""
     
     auth_service = FakeAuthService(
-        is_role_ensured=False,
         is_user_found=True,
+        user_role=UserRole.USER
     )
     
-    uc = TestAuthorizeUseCase(auth_service, UserRole.ADMIN)
+    uc = TestAuthorizeUseCase(auth_service)
     presenter = FakeAuthorizationPresenter()
     
     await uc.execute(DTO(), presenter)

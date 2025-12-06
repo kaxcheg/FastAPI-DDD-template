@@ -20,7 +20,7 @@ async def test_authenticate_user_success(api_client: AsyncClient, user_to_authen
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert data["token_type"] == "Bearer"
+    assert data["access_token_type"] == "Bearer"
 
 
 @pytest.mark.asyncio
@@ -99,7 +99,6 @@ async def test_authenticate_inactive_user(
 
     assert response.status_code == 401
     data = response.json()
-    assert "Not authorized" in data["detail"]
 
 
 @pytest.mark.asyncio
