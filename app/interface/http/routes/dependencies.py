@@ -24,19 +24,26 @@ from app.infrastructure.security.adapters.services import (
     BcryptPasswordVerifier,
 )
 from app.infrastructure.security.jwt_service import JwtTokenService
+from app.infrastructure.security.random_hex_token_service import RandomHEXTokenService
 
 cfg = get_settings()
 
 
 @lru_cache
-def get_jwt_service() -> JwtTokenService:
-    """Return a cached JwtTokenService instance."""
+def get_access_token_service() -> JwtTokenService:
+    """Return JWT service for short-lived access tokens."""
     return JwtTokenService(
         secret=cfg.JWT_SECRET,
         algorithm=cfg.JWT_ALGORITHM,
-        default_expires=timedelta(minutes=cfg.JWT_TOKEN_EXPIRY_TIME),
+        default_expires=timedelta(minutes=cfg.JWT_TOKEN_EXPIRY),
         required_claims=("sub", "exp", "role", "sid"),
     )
+
+
+@lru_cache
+def get_refresh_token_service() -> RandomHEXTokenService:
+    """Return service for generating/hashing refresh tokens."""
+    return RandomHEXTokenService(token_length=cfg.REFRESH_TOKEN_LENGTH)
 
 
 @lru_cache

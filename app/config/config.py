@@ -20,11 +20,19 @@ class BaseConfig(BaseSettings):
     DEBUG: bool
 
     JWT_ALGORITHM: str
-    JWT_TOKEN_EXPIRY_TIME: int = 60  # in minutes
     JWT_SECRET: SecretStr
+    JWT_TOKEN_EXPIRY: int = 60  # in minutes (1 hour)
+    REFRESH_TOKEN_EXPIRY: int = 43200  # in minutes (30 days)
+    REFRESH_TOKEN_LENGTH: int = 32
 
-    SESSION_EXPIRY_TIME: int = 60  # in minutes
+    SESSION_EXPIRY_TIME: int = 43200  # in minutes (30 days, matches refresh token)
     MAX_CONCURRENT_SESSIONS: int = 5
+
+    COOKIE_SECURE: bool = True  # HTTPS only in production
+    COOKIE_HTTPONLY: bool = True
+    COOKIE_SAMESITE: Literal["strict", "lax", "none"] = "lax"
+    COOKIE_DOMAIN: str | None = None  # None = current domain only
+    COOKIE_PATH: str = "/"
 
     DB_PATH: str
     DB_HOST: str
@@ -34,16 +42,25 @@ class BaseConfig(BaseSettings):
     DB_USER_SECRET: SecretStr
     DB_TABLE_SCHEMA: str
 
-    BOOTSTRAP_FLAG: bool
+    BOOTSTRAP_FLAG: bool = True
     BOOTSTRAP_ADMIN: str
     BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
 
-    @field_validator("JWT_TOKEN_EXPIRY_TIME")
+    @field_validator("JWT_TOKEN_EXPIRY", "REFRESH_TOKEN_EXPIRY")
     @classmethod
-    def _positive(cls, v: int) -> int:
+    def _positive_expiry(cls, v: int) -> int:
         """Ensure token expiry is positive."""
         if v <= 0:
-            raise ValueError("JWT_TOKEN_EXPIRY_TIME must be positive")
+            raise ValueError("Token expiry must be positive")
+        return v
+
+    @field_validator("REFRESH_TOKEN_EXPIRY")
+    @classmethod
+    def _refresh_longer_than_access(cls, v: int, info) -> int:
+        """Ensure refresh token lives longer than access token."""
+        access_expiry = info.data.get("JWT_TOKEN_EXPIRY", 60)
+        if v <= access_expiry:
+            raise ValueError("Refresh token expiry must be > access token expiry")
         return v
 
     @property
@@ -67,6 +84,8 @@ class DevConfig(BaseConfig):
         secrets_dir="/run/secrets",
         extra="ignore",
     )
+
+    COOKIE_SECURE: bool = False  # Allow HTTP in development
 
     @field_validator("DEBUG")
     @classmethod
@@ -118,6 +137,14 @@ class ProdConfig(BaseConfig):
         """Deny weak secrets in production."""
         if "secret" in v.get_secret_value():
             raise ValueError("Invalid JWT_SECRET in production")
+        return v
+
+    @field_validator("COOKIE_SECURE")
+    @classmethod
+    def _enforce_secure_cookie(cls, v: bool) -> bool:
+        """Ensure cookies are secure in production."""
+        if not v:
+            raise ValueError("COOKIE_SECURE must be True in production")
         return v
 
 

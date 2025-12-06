@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.config import get_settings
 from app.domain.value_objects.constants import (
     RAW_PASSWORD_MAX_LEN,
     RAW_PASSWORD_MIN_LEN,
@@ -7,14 +8,35 @@ from app.domain.value_objects.constants import (
     USERNAME_MIN_LEN,
 )
 
+cfg = get_settings()
+
 
 class ErrorResponse(BaseModel):
     detail: str
 
 
 class Token(BaseModel):
+    """OAuth2-compatible token response with refresh token support."""
+
     access_token: str
-    token_type: str
+    access_token_type: str
+    expires_in: int  # Access token lifetime in seconds
+    refresh_token: str | None = Field(
+        default=None,
+        min_length=cfg.REFRESH_TOKEN_LENGTH * 2,
+        max_length=cfg.REFRESH_TOKEN_LENGTH * 2,
+    )  # Optional (only for API clients)
+    refresh_expires_in: int  # Refresh token lifetime in seconds
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request body for refresh endpoint (JSON clients)."""
+
+    refresh_token: str = Field(
+        ...,
+        min_length=cfg.REFRESH_TOKEN_LENGTH * 2,
+        max_length=cfg.REFRESH_TOKEN_LENGTH * 2,
+    )
 
 
 class CreateUserRequest(BaseModel):
