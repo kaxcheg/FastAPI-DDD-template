@@ -72,12 +72,8 @@ async def get_user(
     presenter = FastAPIAuthPresenter[GetUserOutputDTO]()
     await uc.execute(GetUserInputDTO(user_id=user_id), presenter)
 
-    if presenter.state is State.OK and isinstance(
-        presenter.response, GetUserOutputDTO
-    ):
-        return GetUserResponse(
-            user=UserResponse(**asdict(presenter.response.user))
-        )
+    if presenter.state is State.OK and isinstance(presenter.response, GetUserOutputDTO):
+        return GetUserResponse(user=UserResponse(**asdict(presenter.response.user)))
 
     if isinstance(presenter.response, str):
         raise_for_presenter_400_state(presenter)

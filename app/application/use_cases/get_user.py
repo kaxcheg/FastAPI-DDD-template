@@ -13,9 +13,7 @@ from app.domain.exceptions import ValueObjectError
 from app.domain.value_objects import UserId, UserRole
 
 
-class GetUserUseCase(
-    AuthorizeUserUseCase[GetUserInputDTO, GetUserOutputDTO]
-):
+class GetUserUseCase(AuthorizeUserUseCase[GetUserInputDTO, GetUserOutputDTO]):
     """Use case for getting a single user by ID."""
 
     _required_roles: list[UserRole] = [UserRole.ADMIN, UserRole.USER]
