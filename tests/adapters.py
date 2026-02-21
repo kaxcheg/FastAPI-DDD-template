@@ -7,7 +7,7 @@ from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, 
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO
+from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO, GetUserOutputDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
@@ -49,6 +49,9 @@ class FakeCreateUserPresenter(AuthPresenter[CreateUserOutputDTO]):
 
 class FakeGetAllUsersPresenter(AuthPresenter[GetAllUsersOutputDTO]):
     """Test presenter for GetAllUsers use case."""
+
+class FakeGetUserPresenter(AuthPresenter[GetUserOutputDTO]):
+    """Test presenter for GetUser use case."""
 
 
 class InMemoryUserRepository(UserRepository):

@@ -8,17 +8,25 @@ from app.application.dto import (
     CreateUserOutputDTO,
     GetAllUsersInputDTO,
     GetAllUsersOutputDTO,
+    GetUserInputDTO,
+    GetUserOutputDTO,
 )
 from app.application.ports.presenters import State
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.get_all_users import GetAllUsersUseCase
+from app.application.use_cases.get_user import GetUserUseCase
 from app.interface.http.adapters.presenters import FastAPIAuthPresenter
-from app.interface.http.routes.dependencies import get_all_users_uc, get_create_user_uc
+from app.interface.http.routes.dependencies import (
+    get_all_users_uc,
+    get_create_user_uc,
+    get_user_uc,
+)
 from app.interface.http.schemas import (
     CreateUserRequest,
     CreateUserResponse,
     ErrorResponse,
     GetAllUsersResponse,
+    GetUserResponse,
     UserResponse,
 )
 from app.interface.http.utils import raise_for_presenter_400_state
@@ -40,6 +48,32 @@ async def get_all_users(
         return GetAllUsersResponse(
             users=[UserResponse(**asdict(user)) for user in presenter.response.users]
         )
+
+    if isinstance(presenter.response, str):
+        raise_for_presenter_400_state(presenter)
+    else:
+        raise ValueError("Wrong presenter response type")
+
+
+@router.get(
+    "/{user_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=GetUserResponse,
+    responses={
+        404: {"description": "Not found", "model": ErrorResponse},
+        422: {"description": "Unprocessable entity", "model": ErrorResponse},
+    },
+)
+async def get_user(
+    user_id: str,
+    uc: Annotated[GetUserUseCase, Depends(get_user_uc)],
+) -> GetUserResponse:
+    """Get a single user by ID."""
+    presenter = FastAPIAuthPresenter[GetUserOutputDTO]()
+    await uc.execute(GetUserInputDTO(user_id=user_id), presenter)
+
+    if presenter.state is State.OK and isinstance(presenter.response, GetUserOutputDTO):
+        return GetUserResponse(user=UserResponse(**asdict(presenter.response.user)))
 
     if isinstance(presenter.response, str):
         raise_for_presenter_400_state(presenter)

@@ -45,3 +45,13 @@ class UserDTO(DTO):
 @dataclass(slots=True, frozen=True)
 class GetAllUsersOutputDTO(DTO):
     users: list[UserDTO]
+
+
+@dataclass(slots=True, frozen=True)
+class GetUserInputDTO(DTO):
+    user_id: str
+
+
+@dataclass(slots=True, frozen=True)
+class GetUserOutputDTO(DTO):
+    user: UserDTO
