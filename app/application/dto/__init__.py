@@ -5,6 +5,8 @@ from app.application.dto.dto import (
     CreateUserOutputDTO,
     GetAllUsersInputDTO,
     GetAllUsersOutputDTO,
+    GetUserInputDTO,
+    GetUserOutputDTO,
     UserDTO,
 )
 
@@ -15,5 +17,7 @@ __all__ = [
     "CreateUserOutputDTO",
     "GetAllUsersInputDTO",
     "GetAllUsersOutputDTO",
+    "GetUserInputDTO",
+    "GetUserOutputDTO",
     "UserDTO",
 ]

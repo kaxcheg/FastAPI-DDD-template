@@ -62,3 +62,7 @@ class UserResponse(BaseModel):
 
 class GetAllUsersResponse(BaseModel):
     users: list[UserResponse]
+
+
+class GetUserResponse(BaseModel):
+    user: UserResponse
