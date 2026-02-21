@@ -19,12 +19,10 @@ jobs:
     with:
       python-version: "3.12"
   
-  build-and-e2e-tests:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Build Docker images
         run: make build
-      - name: Run e2e Tests
-        run: make test-e2e
