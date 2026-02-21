@@ -41,7 +41,7 @@ JQ ?= jq
 # Phony targets
 # -----------------------
 .PHONY: help build compose-build up down restart logs ps db-up db-down \
-        bootstrap run test test-unit test-int test-e2e lint clean images rm-image
+        bootstrap run test test-unit test-int test-e2e lint lint-fix clean images rm-image
 
 # -----------------------
 # Help
@@ -63,6 +63,7 @@ help:
 	@printf "  test-unit        run only unit tests (fast, no Docker)\n"
 	@printf "  test-int         run only integration tests (requires Docker)\n"
 	@printf "  lint             run linters if installed (black/ruff/isort/mypy)\n"
+	@printf "  lint-fix         auto-fix lint issues (black/ruff/isort)\n"
 	@printf "  clean            remove compose containers and local image $(FULL_IMAGE)\n"
 	@printf "  images           list local images for $(IMAGE)\n"
 	@printf "  rm-image         remove specific image by TAG (usage: make rm-image TAG=...)\n\n"
@@ -208,6 +209,36 @@ lint:
 		poetry run mypy $(APP_DIR); \
 	else \
 		echo "mypy not installed, skipping"; \
+	fi
+
+lint-fix:
+	@echo "Auto-fixing lint issues..."
+
+	@echo "Running black (format)"
+	@if command -v black >/dev/null 2>&1; then \
+		black $(APP_DIR); \
+	elif command -v poetry >/dev/null 2>&1; then \
+		poetry run black $(APP_DIR); \
+	else \
+		echo "black not installed, skipping"; \
+	fi
+
+	@echo "Running ruff (fix)"
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff check --fix $(APP_DIR); \
+	elif command -v poetry >/dev/null 2>&1; then \
+		poetry run ruff check --fix $(APP_DIR); \
+	else \
+		echo "ruff not installed, skipping"; \
+	fi
+
+	@echo "Running isort (fix)"
+	@if command -v isort >/dev/null 2>&1; then \
+		isort $(APP_DIR); \
+	elif command -v poetry >/dev/null 2>&1; then \
+		poetry run isort $(APP_DIR); \
+	else \
+		echo "isort not installed, skipping"; \
 	fi
 
 # -----------------------
