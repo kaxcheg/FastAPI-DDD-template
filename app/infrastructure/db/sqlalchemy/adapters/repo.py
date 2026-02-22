@@ -4,9 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.exceptions import DuplicateUserError
 from app.domain.entities.user import User
-from app.domain.entities.user.repo import UserRepository
+from app.domain.exceptions import DuplicateUsernameError
+from app.domain.repositories import UserRepository
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 
@@ -63,7 +63,7 @@ class UserRepositorySQL(UserRepository):
             self._s.add(user_orm)
             await self._s.flush()
         except IntegrityError as e:
-            raise DuplicateUserError(f"User {user.username} already exists") from e
+            raise DuplicateUsernameError(f"User {user.username} already exists") from e
 
     @override
     async def update(self, user: User) -> None:
@@ -77,7 +77,9 @@ class UserRepositorySQL(UserRepository):
         try:
             await self._s.flush()
         except IntegrityError as e:
-            raise DuplicateUserError(f"Username {user.username} already exists") from e
+            raise DuplicateUsernameError(
+                f"Username {user.username} already exists"
+            ) from e
 
     @override
     async def get_all(self) -> list[User]:

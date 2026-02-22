@@ -40,8 +40,7 @@ from sqlalchemy import update, text
 # ORM models are imported inside fixtures to avoid triggering SQLAlchemy init
 # They must be imported AFTER env vars are set
 
-from app.domain.ports import IdGenerator
-from app.domain.value_objects import UserId, UserRawPassword
+from app.domain.value_objects import UserRawPassword
 
 from app.infrastructure.db.sqlalchemy.models.base import Base
 from app.infrastructure.db.sqlalchemy.models.user import UserORM  # noqa: F401
@@ -143,17 +142,6 @@ def password_hasher():
     from app.infrastructure.security.adapters.services import BcryptHasher
 
     return BcryptHasher()
-
-
-@pytest.fixture
-def test_id_generator():
-    """ID generator for tests."""
-
-    class TestIdGenerator(IdGenerator):
-        def new(self) -> UserId:
-            return UserId(uuid4())
-
-    return TestIdGenerator()
 
 
 # ============================================================================

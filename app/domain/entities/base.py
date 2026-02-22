@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Protocol, override
+from typing import Any, override
 
 from app.domain.exceptions.base import DomainError
 from app.domain.value_objects.base import ValueObject
@@ -36,5 +36,5 @@ class Entity[T: ValueObject](ABC):
         return hash(self.id)
 
 
-class Repository(Protocol):
-    """Domain repository interface."""
+class AggregateRoot[T: ValueObject](Entity[T]):
+    """Aggregate root — transactional consistency boundary."""

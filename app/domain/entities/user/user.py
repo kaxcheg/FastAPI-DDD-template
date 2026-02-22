@@ -2,15 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.entities.base import Entity
+from app.domain.entities.base import AggregateRoot
 from app.domain.exceptions.base import DomainError
-from app.domain.ports import IdGenerator
 from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
 
 
 @dataclass(eq=False, kw_only=True)
-class User(Entity[UserId]):
-    """Domain user entity.
+class User(AggregateRoot[UserId]):
+    """User aggregate root.
 
     Args:
         id: Immutable identifier.
@@ -34,7 +33,6 @@ class User(Entity[UserId]):
         username: Username,
         password_hash: UserPasswordHash,
         role: UserRole,
-        id_gen: IdGenerator,
     ) -> User:
         """Create a new user with generated id.
 
@@ -42,13 +40,12 @@ class User(Entity[UserId]):
             username: Unique username.
             password_hash: Secure password hash.
             role: User role.
-            id_gen: Identifier generator.
 
         Returns:
             User: Newly created entity.
         """
         return cls(
-            id=id_gen.new(),
+            id=UserId.new(),
             username=username,
             password_hash=password_hash,
             role=role,
@@ -117,8 +114,6 @@ class User(Entity[UserId]):
         if new == self.role:
             raise DomainError("Role is already set to the given value.")
         self.role = new  # type: ignore[misc]
-        if self.role is UserRole.ADMIN:
-            self.is_active = True  # type: ignore[misc]
 
     def activate(self) -> None:
         """Activate account or raise if already active.

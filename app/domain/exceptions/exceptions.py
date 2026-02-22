@@ -7,3 +7,7 @@ class ValueObjectError(DomainError):
     1. Violations of Value Object invariants during creation.
     2. Single-field validation errors in Entities.
     """
+
+
+class DuplicateUsernameError(DomainError):
+    """Username uniqueness invariant violated."""

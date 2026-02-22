@@ -3,15 +3,15 @@ from __future__ import annotations
 from typing import Callable, override
 
 from app.application.dto import UpdateUserInputDTO, UpdateUserOutputDTO, UserDTO
-from app.application.exceptions import DuplicateUserError
 from app.application.ports.presenters import AuthPresenter
 from app.application.ports.services import AuthService
 from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import AuthorizeUserUseCase
 from app.config.logging import get_logger
-from app.domain.entities.user.repo import UserRepository
-from app.domain.exceptions import ValueObjectError
+from app.domain.exceptions import DuplicateUsernameError, ValueObjectError
 from app.domain.exceptions.base import DomainError
+from app.domain.repositories import UserRepository
+from app.domain.services import UserInvariantService
 from app.domain.value_objects import UserId, Username, UserRole
 
 
@@ -49,29 +49,32 @@ class UpdateUserUseCase(AuthorizeUserUseCase[UpdateUserInputDTO, UpdateUserOutpu
             presenter.bad_request("No fields to update")
             return
 
-        try:
-            async with self._uow_factory() as uow:
-                repo = uow.get_repo(UserRepository)
-                user = await repo.get_by_id(user_id)
+        async with self._uow_factory() as uow:
+            repo = uow.get_repo(UserRepository)
+            user = await repo.get_by_id(user_id)
 
-                if user is None:
-                    presenter.not_found("User not found")
-                    return
+            if user is None:
+                presenter.not_found("User not found")
+                return
 
-                try:
-                    if dto.username is not None:
-                        user.change_username(Username(dto.username))
+            try:
+                if dto.username is not None:
+                    invariant = UserInvariantService(repo)
+                    await invariant.ensure_username_unique(
+                        Username(dto.username), exclude_user_id=user.id
+                    )
+                    user.change_username(Username(dto.username))
 
-                    if dto.role is not None:
-                        user.change_role(UserRole(dto.role))
-                except (DomainError, ValueError) as e:
-                    presenter.domain_error(f"User cannot be updated: {e}")
-                    return
+                if dto.role is not None:
+                    user.change_role(UserRole(dto.role))
 
                 await repo.update(user)
-        except DuplicateUserError:
-            presenter.conflict("Username already exists")
-            return
+            except DuplicateUsernameError:
+                presenter.conflict("Username already exists")
+                return
+            except (DomainError, ValueError) as e:
+                presenter.domain_error(f"User cannot be updated: {e}")
+                return
 
         presenter.ok(
             UpdateUserOutputDTO(

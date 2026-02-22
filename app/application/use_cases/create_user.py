@@ -3,16 +3,16 @@ from __future__ import annotations
 from typing import Callable, override
 
 from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
-from app.application.exceptions import DuplicateUserError
 from app.application.ports.presenters import AuthPresenter
 from app.application.ports.services import AuthService, PasswordHasher
 from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import AuthorizeUserUseCase
 from app.config.logging import get_logger
-from app.domain.entities.user.repo import UserRepository
 from app.domain.entities.user.user import User
+from app.domain.exceptions import DuplicateUsernameError
 from app.domain.exceptions.base import DomainError
-from app.domain.ports.services import IdGenerator
+from app.domain.repositories import UserRepository
+from app.domain.services import UserInvariantService
 from app.domain.value_objects import Username, UserRawPassword, UserRole
 
 
@@ -29,13 +29,11 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
         auth_service: AuthService,
         uow_factory: Callable[[], UnitOfWork],
         hasher: PasswordHasher,
-        id_gen: IdGenerator,
     ) -> None:
         """Initialize with dependencies."""
         super().__init__(auth_service=auth_service)
         self._uow_factory = uow_factory
         self._hasher = hasher
-        self._id_gen = id_gen
 
     @override
     async def run(
@@ -51,7 +49,6 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
                 username=Username(dto.username),
                 password_hash=pwd_hash,
                 role=UserRole(dto.role),
-                id_gen=self._id_gen,
             )
         except (DomainError, ValueError) as e:
             presenter.domain_error(f"User cannot be created: {e}")
@@ -60,8 +57,10 @@ class CreateUserUseCase(AuthorizeUserUseCase[CreateUserInputDTO, CreateUserOutpu
         try:
             async with self._uow_factory() as uow:
                 repo = uow.get_repo(UserRepository)
+                invariant = UserInvariantService(repo)
+                await invariant.ensure_username_unique(user.username)
                 await repo.add(user)
-        except DuplicateUserError:
+        except DuplicateUsernameError:
             presenter.conflict("Username already exists")
             return
 

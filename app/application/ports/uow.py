@@ -7,8 +7,8 @@ from typing import TypeVar, override
 
 from app.application.exceptions.base import ApplicationError
 from app.config.logging import get_logger
-from app.domain.entities.user.repo import Repository
 from app.domain.exceptions.base import DomainError
+from app.domain.repositories import Repository
 
 R = TypeVar("R", bound=Repository)
 

@@ -5,14 +5,13 @@ import sys
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.application.exceptions import DuplicateUserError
 from app.application.ports.uow import UnitOfWork
 from app.config import get_settings
 from app.domain.entities.user import User
-from app.domain.entities.user.repo import UserRepository
+from app.domain.exceptions import DuplicateUsernameError
 from app.domain.exceptions.base import DomainError
+from app.domain.repositories import UserRepository
 from app.domain.value_objects import Username, UserPasswordHash, UserRole
-from app.infrastructure.db.sqlalchemy.adapters.services import UUIDv4Generator
 from app.infrastructure.db.sqlalchemy.adapters.uow import UoWSQL
 
 cfg = get_settings()
@@ -42,7 +41,6 @@ async def main() -> int:
             username=Username(username),
             password_hash=UserPasswordHash(value=password_hash.encode()),
             role=UserRole.ADMIN,
-            id_gen=UUIDv4Generator(),
         )
     except (DomainError, ValueError) as e:
         sys.exit(
@@ -53,7 +51,7 @@ async def main() -> int:
         async with uow_factory() as uow:
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
-    except DuplicateUserError:
+    except DuplicateUsernameError:
         print("[dddapitpl_bootstrap] Username already exists")
         sys.exit(0)
 

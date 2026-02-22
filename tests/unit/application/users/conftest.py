@@ -6,11 +6,10 @@ from app.domain.value_objects.constants import HASH_LEN
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 
 from tests.adapters import (
-    TestUser, 
-    FakeUoW, 
-    FakePasswordVerifier, 
+    TestUser,
+    FakeUoW,
+    FakePasswordVerifier,
     FakePasswordHasher,
-    FakeIdGenerator
 )
 
 
@@ -60,13 +59,3 @@ def authenticate_use_case(uow_factory, password_verifier):
 def password_hasher():
     """Password hasher fixture."""
     return FakePasswordHasher()
-
-
-@pytest.fixture(scope="session")
-def id_generator():
-    """ID generator fixture."""
-    return FakeIdGenerator()
-
-# @pytest.fixture(scope="session")
-# def successful_auth_service():
-#     return FakeAuthService(is_user_found=True, is_role_ensured=True)
