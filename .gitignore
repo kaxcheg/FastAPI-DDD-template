@@ -196,3 +196,5 @@ log/
 
 # secrets
 secrets
+CLAUDE.local.md
+.claude/settings.json
