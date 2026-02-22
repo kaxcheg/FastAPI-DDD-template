@@ -74,6 +74,7 @@ class UserRepositorySQL(UserRepository):
         row.username = str(user.username)
         row.password_hash = user.password_hash.value
         row.role = UserRole(user.role)
+        row.is_active = user.is_active
         try:
             await self._s.flush()
         except IntegrityError as e:

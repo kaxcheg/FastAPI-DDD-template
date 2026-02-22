@@ -8,7 +8,7 @@ from app.domain.exceptions import DuplicateUsernameError
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO, GetUserOutputDTO, UpdateUserOutputDTO
+from app.application.dto import AuthResponseDTO, ChangePasswordOutputDTO, CreateUserOutputDTO, DeleteUserOutputDTO, GetAllUsersOutputDTO, GetUserOutputDTO, UpdateUserOutputDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher
@@ -56,6 +56,12 @@ class FakeGetUserPresenter(AuthPresenter[GetUserOutputDTO]):
 
 class FakeUpdateUserPresenter(AuthPresenter[UpdateUserOutputDTO]):
     """Test presenter for UpdateUser use case."""
+
+class FakeChangePasswordPresenter(AuthPresenter[ChangePasswordOutputDTO]):
+    """Test presenter for ChangePassword use case."""
+
+class FakeDeleteUserPresenter(AuthPresenter[DeleteUserOutputDTO]):
+    """Test presenter for DeleteUser use case."""
 
 
 class InMemoryUserRepository(UserRepository):
@@ -151,9 +157,15 @@ class FakeUoW(UnitOfWork):
 class FakeAuthService(AuthService):
     """Test authentication service implementation."""
 
-    def __init__(self, is_user_found: bool, user_role:UserRole=UserRole.ADMIN):
+    def __init__(
+        self,
+        is_user_found: bool,
+        user_role: UserRole = UserRole.ADMIN,
+        user_id: UserId | None = None,
+    ):
         self.user_role = user_role
         self.is_user_found = is_user_found
+        self.user_id = user_id or UserId.new()
 
     async def current_user(self) -> User:
         """Get current authenticated user."""
@@ -161,7 +173,7 @@ class FakeAuthService(AuthService):
             raise NotAuthenticatedError("No authenticated user")
 
         user_stub = User.from_storage(
-                id=UserId.new(),
+                id=self.user_id,
                 username=Username("stub_user"),
                 password_hash=UserPasswordHash(("x"*HASH_LEN).encode()),
                 role=UserRole.USER if self.user_role is UserRole.USER else UserRole.ADMIN

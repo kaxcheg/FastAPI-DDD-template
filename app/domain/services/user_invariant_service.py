@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.domain.exceptions import DuplicateUsernameError
+from app.domain.exceptions import DuplicateUsernameError, SelfDeletionError
 from app.domain.repositories import UserRepository
 from app.domain.value_objects import UserId, Username
 
@@ -34,3 +34,20 @@ class UserInvariantService:
             exclude_user_id is None or existing.id != exclude_user_id
         ):
             raise DuplicateUsernameError(f"Username '{username}' is already taken.")
+
+    @staticmethod
+    def ensure_not_self_deletion(
+        current_user_id: UserId,
+        target_user_id: UserId,
+    ) -> None:
+        """Verify that the admin is not deleting themselves.
+
+        Args:
+            current_user_id: ID of the acting admin.
+            target_user_id: ID of the user being deleted.
+
+        Raises:
+            SelfDeletionError: When admin tries to delete themselves.
+        """
+        if current_user_id == target_user_id:
+            raise SelfDeletionError("Admin cannot delete themselves.")

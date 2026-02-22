@@ -7,7 +7,9 @@ from fastapi import Depends, Request
 from app.application.ports.services import AuthService, PasswordHasher, PasswordVerifier
 from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
+from app.application.use_cases.change_password import ChangePasswordUseCase
 from app.application.use_cases.create_user import CreateUserUseCase
+from app.application.use_cases.delete_user import DeleteUserUseCase
 from app.application.use_cases.get_all_users import GetAllUsersUseCase
 from app.application.use_cases.get_user import GetUserUseCase
 from app.application.use_cases.update_user import UpdateUserUseCase
@@ -125,6 +127,30 @@ def get_update_user_uc(
 ) -> UpdateUserUseCase:
     """Return UpdateUser use case with injected ports."""
     return UpdateUserUseCase(
+        auth_service=auth_service,
+        uow_factory=uow_factory,
+    )
+
+
+def get_change_password_uc(
+    uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
+    hasher: Annotated[PasswordHasher, Depends(get_hasher)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> ChangePasswordUseCase:
+    """Return ChangePassword use case with injected ports."""
+    return ChangePasswordUseCase(
+        auth_service=auth_service,
+        uow_factory=uow_factory,
+        hasher=hasher,
+    )
+
+
+def get_delete_user_uc(
+    uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> DeleteUserUseCase:
+    """Return DeleteUser use case with injected ports."""
+    return DeleteUserUseCase(
         auth_service=auth_service,
         uow_factory=uow_factory,
     )
