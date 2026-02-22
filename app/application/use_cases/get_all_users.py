@@ -8,7 +8,7 @@ from app.application.ports.services import AuthService
 from app.application.ports.uow import UnitOfWork
 from app.application.use_cases.base import AuthorizeUserUseCase
 from app.config.logging import get_logger
-from app.domain.entities.user.repo import UserRepository
+from app.domain.repositories import UserRepository
 from app.domain.value_objects import UserRole
 
 

@@ -4,11 +4,12 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.repositories import Repository
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 from app.infrastructure.db.sqlalchemy.models.user_sessions import UserSessionORM
 
 
-class UserSessionORMRepo:
+class UserSessionORMRepo(Repository):
     def __init__(self, db_session: AsyncSession) -> None:
         self._s = db_session
 

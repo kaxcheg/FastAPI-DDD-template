@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from app.domain.entities.base import Repository
 from app.domain.entities.user import User
 from app.domain.value_objects import UserId, Username
 
 
-class UserRepository(ABC, Repository):
-    """Repository contract for user entities."""
+class Repository(ABC):
+    """Domain repository marker."""
+
+
+class UserRepository(Repository):
+    """Repository contract for user aggregate."""
 
     @abstractmethod
     async def get_by_username(self, username: Username) -> User | None:

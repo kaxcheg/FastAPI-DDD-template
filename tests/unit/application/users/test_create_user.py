@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.entities.user.repo import UserRepository
+from app.domain.repositories import UserRepository
 from app.domain.value_objects import UserRole, Username
 
 from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
@@ -13,7 +13,6 @@ from tests.adapters import FakeCreateUserPresenter, FakeAuthService
 async def test_create_user_success(
     uow_factory,
     password_hasher,
-    id_generator,
 ):
     """Test successful user creation by admin."""
 
@@ -23,23 +22,22 @@ async def test_create_user_success(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
-        id_gen=id_generator
     )
-    
+
     dto = CreateUserInputDTO(
         username="new_user",
         password="secure_password123",
         role=UserRole.USER
     )
     presenter = FakeCreateUserPresenter()
-    
+
     await use_case.execute(dto, presenter)
-    
+
     assert presenter.state is State.OK
     assert isinstance(presenter.response, CreateUserOutputDTO)
     assert presenter.response.username == dto.username
     assert presenter.response.role == dto.role
-    
+
     async with uow_factory() as uow:
         uow: UnitOfWork
         repo = uow.get_repo(UserRepository)
@@ -52,7 +50,6 @@ async def test_create_user_success(
 async def test_create_user_conflict(
     uow_factory,
     password_hasher,
-    id_generator,
     initial_users
 ):
     """Test user creation fails when username already exists."""
@@ -63,9 +60,8 @@ async def test_create_user_conflict(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
-        id_gen=id_generator
     )
-    
+
     existing_user = initial_users[0]
     dto = CreateUserInputDTO(
         username=existing_user.username,
@@ -73,9 +69,9 @@ async def test_create_user_conflict(
         role=UserRole.USER
     )
     presenter = FakeCreateUserPresenter()
-    
+
     await use_case.execute(dto, presenter)
-    
+
     assert presenter.state == State.CONFLICT
     assert presenter.response == "Username already exists"
 
@@ -84,7 +80,6 @@ async def test_create_user_conflict(
 async def test_create_user_validation_error(
     uow_factory,
     password_hasher,
-    id_generator
 ):
     """Test user creation fails with invalid input data."""
 
@@ -94,18 +89,17 @@ async def test_create_user_validation_error(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
-        id_gen=id_generator
     )
-    
+
     dto = CreateUserInputDTO(
         username="",
         password="password123",
         role=UserRole.USER
     )
     presenter = FakeCreateUserPresenter()
-    
+
     await use_case.execute(dto, presenter)
-    
+
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
 
@@ -114,7 +108,6 @@ async def test_create_user_validation_error(
 async def test_create_user_invalid_role(
     uow_factory,
     password_hasher,
-    id_generator
 ):
     """Test user creation fails with invalid role."""
 
@@ -124,18 +117,17 @@ async def test_create_user_invalid_role(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
-        id_gen=id_generator
     )
-    
+
     dto = CreateUserInputDTO(
         username="new_user",
         password="password123",
         role="INVALID_ROLE"
     )
     presenter = FakeCreateUserPresenter()
-    
+
     await use_case.execute(dto, presenter)
-    
+
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)
 
@@ -144,7 +136,6 @@ async def test_create_user_invalid_role(
 async def test_create_user_empty_password(
     uow_factory,
     password_hasher,
-    id_generator
 ):
     """Test user creation fails with empty password."""
 
@@ -154,17 +145,16 @@ async def test_create_user_empty_password(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=password_hasher,
-        id_gen=id_generator
     )
-    
+
     dto = CreateUserInputDTO(
         username="new_user",
         password="",
         role=UserRole.USER
     )
     presenter = FakeCreateUserPresenter()
-    
+
     await use_case.execute(dto, presenter)
-    
+
     assert presenter.state == State.DOMAIN_ERROR
     assert isinstance(presenter.response, str)

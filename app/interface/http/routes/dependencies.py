@@ -12,10 +12,8 @@ from app.application.use_cases.get_all_users import GetAllUsersUseCase
 from app.application.use_cases.get_user import GetUserUseCase
 from app.application.use_cases.update_user import UpdateUserUseCase
 from app.config import get_settings
-from app.domain.ports.services import IdGenerator
 from app.infrastructure.db.sqlalchemy.adapters.services import (
     TokenSessionAuthService,
-    UUIDv4Generator,
 )
 from app.infrastructure.db.sqlalchemy.adapters.uow import (
     UoWSQL,
@@ -61,12 +59,6 @@ def get_hasher() -> PasswordHasher:
 
 
 @lru_cache
-def get_id_gen() -> IdGenerator:
-    """Return identifier generator implementation."""
-    return UUIDv4Generator()
-
-
-@lru_cache
 def get_verifier() -> PasswordVerifier:
     """Return password verifier implementation."""
     return BcryptPasswordVerifier()
@@ -95,7 +87,6 @@ def get_auth_service(
 def get_create_user_uc(
     uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
     hasher: Annotated[PasswordHasher, Depends(get_hasher)],
-    id_gen: Annotated[IdGenerator, Depends(get_id_gen)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> CreateUserUseCase:
     """Return CreateUser use case with injected ports."""
@@ -103,7 +94,6 @@ def get_create_user_uc(
         auth_service=auth_service,
         uow_factory=uow_factory,
         hasher=hasher,
-        id_gen=id_gen,
     )
 
 

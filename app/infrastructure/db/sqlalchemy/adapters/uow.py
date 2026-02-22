@@ -9,8 +9,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.application.ports.uow import UnitOfWork
-from app.domain.entities.base import Repository
-from app.domain.entities.user.repo import UserRepository
+from app.domain.repositories import Repository, UserRepository
 from app.infrastructure.db.sqlalchemy.adapters.repo import UserRepositorySQL
 from app.infrastructure.db.sqlalchemy.user_session_repo import UserSessionORMRepo
 
