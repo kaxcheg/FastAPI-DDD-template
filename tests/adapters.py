@@ -7,7 +7,7 @@ from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, 
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
-from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO, GetUserOutputDTO
+from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, GetAllUsersOutputDTO, GetUserOutputDTO, UpdateUserOutputDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
 from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
@@ -53,6 +53,9 @@ class FakeGetAllUsersPresenter(AuthPresenter[GetAllUsersOutputDTO]):
 class FakeGetUserPresenter(AuthPresenter[GetUserOutputDTO]):
     """Test presenter for GetUser use case."""
 
+class FakeUpdateUserPresenter(AuthPresenter[UpdateUserOutputDTO]):
+    """Test presenter for UpdateUser use case."""
+
 
 class InMemoryUserRepository(UserRepository):
     """In-memory implementation of UserRepository."""
@@ -83,6 +86,19 @@ class InMemoryUserRepository(UserRepository):
         """Save or update user."""
         if user.id in self.users_by_id or user.username in self.users_by_username:
             raise DuplicateUserError
+        self.users_by_id[user.id] = user
+        self.users_by_username[user.username] = user
+
+    async def update(self, user: User) -> None:
+        """Update user in memory store."""
+        old_user = self.users_by_id.get(user.id)
+        if old_user is None:
+            raise ValueError(f"User {user.id} not found")
+        existing = self.users_by_username.get(user.username)
+        if existing is not None and existing.id != user.id:
+            raise DuplicateUserError(f"Username {user.username} already exists")
+        if old_user.username in self.users_by_username:
+            del self.users_by_username[old_user.username]
         self.users_by_id[user.id] = user
         self.users_by_username[user.username] = user
 

@@ -66,6 +66,20 @@ class UserRepositorySQL(UserRepository):
             raise DuplicateUserError(f"User {user.username} already exists") from e
 
     @override
+    async def update(self, user: User) -> None:
+        """Persist updated user state or raise on conflict."""
+        row = await self._s.get(UserORM, user.id.value)
+        if row is None:
+            raise ValueError(f"User {user.id} not found in database")
+        row.username = str(user.username)
+        row.password_hash = user.password_hash.value
+        row.role = UserRole(user.role)
+        try:
+            await self._s.flush()
+        except IntegrityError as e:
+            raise DuplicateUserError(f"Username {user.username} already exists") from e
+
+    @override
     async def get_all(self) -> list[User]:
         """Return all users from database."""
         result = await self._s.scalars(select(UserORM))

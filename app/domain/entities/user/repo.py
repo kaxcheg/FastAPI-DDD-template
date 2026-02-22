@@ -44,6 +44,15 @@ class UserRepository(ABC, Repository):
         ...
 
     @abstractmethod
+    async def update(self, user: User) -> None:
+        """Persist changes to an existing user.
+
+        Args:
+            user: User domain entity with updated state.
+        """
+        ...
+
+    @abstractmethod
     async def get_all(self) -> list[User]:
         """Return all users.
 

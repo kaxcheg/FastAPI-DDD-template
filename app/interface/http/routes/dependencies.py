@@ -10,6 +10,7 @@ from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.get_all_users import GetAllUsersUseCase
 from app.application.use_cases.get_user import GetUserUseCase
+from app.application.use_cases.update_user import UpdateUserUseCase
 from app.config import get_settings
 from app.domain.ports.services import IdGenerator
 from app.infrastructure.db.sqlalchemy.adapters.services import (
@@ -123,6 +124,17 @@ def get_user_uc(
 ) -> GetUserUseCase:
     """Return GetUser use case with injected ports."""
     return GetUserUseCase(
+        auth_service=auth_service,
+        uow_factory=uow_factory,
+    )
+
+
+def get_update_user_uc(
+    uow_factory: Annotated[Callable[[], UnitOfWork], Depends(get_uow_factory)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> UpdateUserUseCase:
+    """Return UpdateUser use case with injected ports."""
+    return UpdateUserUseCase(
         auth_service=auth_service,
         uow_factory=uow_factory,
     )

@@ -10,6 +10,7 @@ class State(Enum):
     """Operation result states."""
 
     OK = auto()
+    BAD_REQUEST = auto()
     DOMAIN_ERROR = auto()
     UNAUTHORIZED = auto()
     FORBIDDEN = auto()
@@ -36,6 +37,11 @@ class Presenter[D: DTO](Protocol):
         """Set success state and DTO."""
         self._state = State.OK
         self.response = dto
+
+    def bad_request(self, message: str) -> None:
+        """Set bad-request state with message."""
+        self._state = State.BAD_REQUEST
+        self.response = message
 
     def domain_error(self, message: str) -> None:
         """Set error state with message."""

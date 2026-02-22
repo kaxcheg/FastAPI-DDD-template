@@ -10,15 +10,19 @@ from app.application.dto import (
     GetAllUsersOutputDTO,
     GetUserInputDTO,
     GetUserOutputDTO,
+    UpdateUserInputDTO,
+    UpdateUserOutputDTO,
 )
 from app.application.ports.presenters import State
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.get_all_users import GetAllUsersUseCase
 from app.application.use_cases.get_user import GetUserUseCase
+from app.application.use_cases.update_user import UpdateUserUseCase
 from app.interface.http.adapters.presenters import FastAPIAuthPresenter
 from app.interface.http.routes.dependencies import (
     get_all_users_uc,
     get_create_user_uc,
+    get_update_user_uc,
     get_user_uc,
 )
 from app.interface.http.schemas import (
@@ -27,6 +31,8 @@ from app.interface.http.schemas import (
     ErrorResponse,
     GetAllUsersResponse,
     GetUserResponse,
+    UpdateUserRequest,
+    UpdateUserResponse,
     UserResponse,
 )
 from app.interface.http.utils import raise_for_presenter_400_state
@@ -74,6 +80,46 @@ async def get_user(
 
     if presenter.state is State.OK and isinstance(presenter.response, GetUserOutputDTO):
         return GetUserResponse(user=UserResponse(**asdict(presenter.response.user)))
+
+    if isinstance(presenter.response, str):
+        raise_for_presenter_400_state(presenter)
+    else:
+        raise ValueError("Wrong presenter response type")
+
+
+@router.patch(
+    "/{user_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=UpdateUserResponse,
+    responses={
+        400: {"description": "Bad request", "model": ErrorResponse},
+        404: {"description": "Not found", "model": ErrorResponse},
+        409: {"description": "Conflict", "model": ErrorResponse},
+        422: {"description": "Unprocessable entity", "model": ErrorResponse},
+    },
+)
+async def update_user(
+    user_id: str,
+    body: UpdateUserRequest,
+    uc: Annotated[UpdateUserUseCase, Depends(get_update_user_uc)],
+) -> UpdateUserResponse:
+    """Update an existing user (admin only)."""
+    presenter = FastAPIAuthPresenter[UpdateUserOutputDTO]()
+    await uc.execute(
+        UpdateUserInputDTO(
+            user_id=user_id,
+            username=body.username,
+            role=body.role,
+        ),
+        presenter,
+    )
+
+    if presenter.state is State.OK and isinstance(
+        presenter.response, UpdateUserOutputDTO
+    ):
+        return UpdateUserResponse(
+            user=UserResponse(**asdict(presenter.response.user))
+        )
 
     if isinstance(presenter.response, str):
         raise_for_presenter_400_state(presenter)

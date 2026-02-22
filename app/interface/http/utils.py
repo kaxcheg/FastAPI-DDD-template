@@ -9,6 +9,10 @@ def raise_for_presenter_400_state(p: Presenter) -> NoReturn:
     if not isinstance(p.response, str):
         raise ValueError("Wrong type for presenter response. str expected.")
     match p.state:
+        case State.BAD_REQUEST:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=p.response
+            )
         case State.UNAUTHORIZED:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

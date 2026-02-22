@@ -55,3 +55,15 @@ class GetUserInputDTO(DTO):
 @dataclass(slots=True, frozen=True)
 class GetUserOutputDTO(DTO):
     user: UserDTO
+
+
+@dataclass(slots=True, frozen=True)
+class UpdateUserInputDTO(DTO):
+    user_id: str
+    username: str | None = None
+    role: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class UpdateUserOutputDTO(DTO):
+    user: UserDTO

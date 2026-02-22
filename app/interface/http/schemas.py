@@ -66,3 +66,14 @@ class GetAllUsersResponse(BaseModel):
 
 class GetUserResponse(BaseModel):
     user: UserResponse
+
+
+class UpdateUserRequest(BaseModel):
+    username: str | None = Field(
+        default=None, min_length=USERNAME_MIN_LEN, max_length=USERNAME_MAX_LEN
+    )
+    role: str | None = None
+
+
+class UpdateUserResponse(BaseModel):
+    user: UserResponse
