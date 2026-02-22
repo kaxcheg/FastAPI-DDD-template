@@ -117,9 +117,7 @@ async def update_user(
     if presenter.state is State.OK and isinstance(
         presenter.response, UpdateUserOutputDTO
     ):
-        return UpdateUserResponse(
-            user=UserResponse(**asdict(presenter.response.user))
-        )
+        return UpdateUserResponse(user=UserResponse(**asdict(presenter.response.user)))
 
     if isinstance(presenter.response, str):
         raise_for_presenter_400_state(presenter)
