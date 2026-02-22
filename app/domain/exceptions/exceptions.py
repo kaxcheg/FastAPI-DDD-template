@@ -11,3 +11,7 @@ class ValueObjectError(DomainError):
 
 class DuplicateUsernameError(DomainError):
     """Username uniqueness invariant violated."""
+
+
+class SelfDeletionError(DomainError):
+    """Admin attempted to delete themselves."""

@@ -77,3 +77,17 @@ class UpdateUserRequest(BaseModel):
 
 class UpdateUserResponse(BaseModel):
     user: UserResponse
+
+
+class ChangePasswordRequest(BaseModel):
+    new_password: str = Field(
+        ..., min_length=RAW_PASSWORD_MIN_LEN, max_length=RAW_PASSWORD_MAX_LEN
+    )
+
+
+class ChangePasswordResponse(BaseModel):
+    user: UserResponse
+
+
+class DeleteUserResponse(BaseModel):
+    user: UserResponse

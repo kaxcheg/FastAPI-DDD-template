@@ -67,3 +67,24 @@ class UpdateUserInputDTO(DTO):
 @dataclass(slots=True, frozen=True)
 class UpdateUserOutputDTO(DTO):
     user: UserDTO
+
+
+@dataclass(slots=True, frozen=True)
+class ChangePasswordInputDTO(DTO):
+    user_id: str
+    new_password: str
+
+
+@dataclass(slots=True, frozen=True)
+class ChangePasswordOutputDTO(DTO):
+    user: UserDTO
+
+
+@dataclass(slots=True, frozen=True)
+class DeleteUserInputDTO(DTO):
+    user_id: str
+
+
+@dataclass(slots=True, frozen=True)
+class DeleteUserOutputDTO(DTO):
+    user: UserDTO
