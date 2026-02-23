@@ -1,0 +1,82 @@
+name: dddapitpl-django
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_ADMIN}
+      POSTGRES_PASSWORD: ${DB_ADMIN_SECRET}
+      POSTGRES_DB: ${DB_PATH}
+    ports:
+      - "5432:5432"
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  db-bootstrap:
+    image: postgres:16
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint:
+    - /bin/bash
+    - -lc
+    - bash /bootstrap/bootstrap_db.sh
+    environment:
+      DB_HOST: db
+      DB_ADMIN: ${DB_ADMIN}
+      DB_PATH: ${DB_PATH}
+      DB_USER: ${DB_USER}
+      DB_TABLE_SCHEMA: ${DB_TABLE_SCHEMA}
+      DB_USER_SECRET: ${DB_USER_SECRET}
+      PGPASSWORD: ${DB_ADMIN_SECRET}
+    volumes:
+    - ../deploy/bootstrap:/bootstrap:ro
+  api:
+    image: dddapitpl-api:dev
+    depends_on:
+      db:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      INTERFACE: django
+      DJANGO_SETTINGS_MODULE: app.interface.drf.settings
+      ENV: ${ENV}
+      DEBUG: ${DEBUG}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_TOKEN_EXPIRY_TIME: ${JWT_TOKEN_EXPIRY_TIME}
+      SESSION_EXPIRY_TIME: ${SESSION_EXPIRY_TIME}
+      DB_DRIVER: ${DB_DRIVER}
+      DB_USER: ${DB_USER}
+      DB_PATH: ${DB_PATH}
+      DB_HOST: ${DB_HOST}
+      DB_TABLE_SCHEMA: ${DB_TABLE_SCHEMA}
+      BOOTSTRAP_FLAG: ${BOOTSTRAP_FLAG}
+      BOOTSTRAP_ADMIN: ${BOOTSTRAP_ADMIN}
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USER_SECRET: ${DB_USER_SECRET}
+      BOOTSTRAP_ADMIN_PASSWORD_HASH: ${BOOTSTRAP_ADMIN_PASSWORD_HASH}
+    ports:
+    - 127.0.0.1:8000:8000
+    - 127.0.0.1:5678:5678   # debugpy
+    restart: unless-stopped
+    entrypoint:
+    - python
+    - ./entrypoint.py
+    - uvicorn
+    - app.interface.drf.asgi:application
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8000"
+    volumes:
+      - ../app/infrastructure/db/django_orm/migrations:/dddapitpl/app/infrastructure/db/django_orm/migrations
+volumes:
+  pgdata: {}
