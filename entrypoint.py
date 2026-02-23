@@ -54,9 +54,19 @@ def run(cmd: list[str]) -> None:
 
 def migrate_and_bootstrap() -> None:
     """Apply migrations; optionally run bootstrap script."""
-    run(["alembic", "upgrade", "head"])
+    interface = os.getenv("INTERFACE", "fastapi")
+    if interface == "django":
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.interface.drf.settings")
+        run(["python", "-m", "django", "migrate", "--no-input"])
+    else:
+        run(["alembic", "upgrade", "head"])
     if _env_bool("BOOTSTRAP_FLAG"):
-        run(["python", "-m", "app.scripts.bootstrap"])
+        bootstrap_mod = (
+            "app.scripts.bootstrap_django"
+            if interface == "django"
+            else "app.scripts.bootstrap"
+        )
+        run(["python", "-m", bootstrap_mod])
     else:
         print("[entrypoint] BOOTSTRAP_FLAG is false → skip bootstrap")
 

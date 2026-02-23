@@ -16,6 +16,9 @@ SHELL := /bin/bash
 
 APP_DIR ?= app
 
+# Interface stack: fastapi (default) or django
+INTERFACE ?= fastapi
+
 # Image / build settings
 IMAGE ?= dddapitpl-api
 TAG ?= dev
@@ -25,8 +28,12 @@ FULL_IMAGE ?= $(IMAGE):$(TAG)
 BUILDX ?= docker buildx build
 BUILD_PLATFORMS ?= linux/amd64
 
-# docker-compose / env
+# docker-compose / env (auto-selected by INTERFACE)
+ifeq ($(INTERFACE),django)
+COMPOSE_FILE ?= ./dev/docker-compose.django.yml
+else
 COMPOSE_FILE ?= ./dev/docker-compose.yml
+endif
 DEV_ENV_FILE ?= ./dev/env.dev
 
 # Tests
@@ -40,8 +47,9 @@ JQ ?= jq
 # -----------------------
 # Phony targets
 # -----------------------
-.PHONY: help build compose-build up down restart logs ps db-up db-down \
-        bootstrap run test test-unit test-int test-e2e lint lint-fix clean images rm-image
+.PHONY: help build up down restart logs ps db-up db-down \
+        bootstrap run run-django migrate-django check-django \
+        test test-unit test-int test-e2e lint lint-fix clean images rm-image
 
 # -----------------------
 # Help
@@ -49,7 +57,6 @@ JQ ?= jq
 help:
 	@printf "\nMakefile targets:\n\n"
 	@printf "  build            Build the application image (buildx).
-	@printf "  compose-build    Build services via docker compose (if compose build contexts exist)\n"
 	@printf "  up               docker compose up (uses --env-file $(DEV_ENV_FILE))\n"
 	@printf "  down             docker compose down\n"
 	@printf "  restart          down then up\n"
@@ -74,17 +81,9 @@ help:
 
 # Build app image using buildx. Context is repo root (Dockerfile in repo root).
 build:
-	@echo "Building (local load) $(FULL_IMAGE) from . (Dockerfile in repo root)..."
-	$(BUILDX) --build-arg WITH_DEV=true --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --load .
+	@echo "Building (local load) $(FULL_IMAGE) INTERFACE=$(INTERFACE) from . (Dockerfile in repo root)..."
+	$(BUILDX) --build-arg WITH_DEV=true --build-arg INTERFACE=$(INTERFACE) --platform=$(BUILD_PLATFORMS) -t $(FULL_IMAGE) --load .
 
-# Build all images defined in compose (if compose has build contexts)
-compose-build:
-	@if [ -f "$(COMPOSE_FILE)" ]; then \
-	  echo "Building compose services from $(COMPOSE_FILE)..."; \
-	  docker compose --env-file $(DEV_ENV_FILE) -f $(COMPOSE_FILE) build; \
-	else \
-	  echo "Compose file $(COMPOSE_FILE) not found"; exit 1; \
-	fi
 
 # -----------------------
 # Compose / runtime targets
@@ -152,8 +151,24 @@ bootstrap:
 
 # Local dev run (requires python env)
 run:
-	@echo "Run uvicorn (dev). Activate venv and ensure dependencies are installed."
+ifeq ($(INTERFACE),django)
+	@echo "Run Django DRF (dev). Activate venv and ensure dependencies are installed."
+	DJANGO_SETTINGS_MODULE=app.interface.drf.settings uvicorn app.interface.drf.asgi:application --reload --host 0.0.0.0 --port 8000
+else
+	@echo "Run FastAPI (dev). Activate venv and ensure dependencies are installed."
 	uvicorn app.interface.http.main:app --reload  --env-file $(DEV_ENV_FILE) --host 0.0.0.0 --port 8000
+endif
+
+# Django-specific targets
+run-django:
+	@echo "Run Django DRF (dev)."
+	DJANGO_SETTINGS_MODULE=app.interface.drf.settings uvicorn app.interface.drf.asgi:application --reload --host 0.0.0.0 --port 8000
+
+migrate-django:
+	DJANGO_SETTINGS_MODULE=app.interface.drf.settings python -m django migrate --no-input
+
+check-django:
+	DJANGO_SETTINGS_MODULE=app.interface.drf.settings python -m django check
 
 # -----------------------
 # Tests / lint

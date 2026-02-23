@@ -10,12 +10,19 @@ RUN pip install --no-cache-dir poetry==2.2.1
 # don't create virtual env
 RUN poetry config virtualenvs.create false
 
-# install dependecies from poetry.lock without self package 
+# install dependecies from poetry.lock without self package
 ARG WITH_DEV=false
-RUN if [ "$WITH_DEV" = "true" ]; then \
-      poetry install --no-root ; \
+# INTERFACE selects which dependency group to install (fastapi or django)
+ARG INTERFACE=fastapi
+RUN if [ "$INTERFACE" = "django" ]; then \
+      EXCLUDE="--without=fastapi"; \
     else \
-      poetry install --without=dev --no-root ; \
+      EXCLUDE="--without=django"; \
+    fi; \
+    if [ "$WITH_DEV" = "true" ]; then \
+      poetry install $EXCLUDE --no-root ; \
+    else \
+      poetry install --without=dev $EXCLUDE --no-root ; \
     fi
 
 # final stage: image build
