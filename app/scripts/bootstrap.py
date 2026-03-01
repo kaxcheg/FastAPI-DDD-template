@@ -49,6 +49,7 @@ async def main() -> int:
 
     try:
         async with uow_factory() as uow:
+            uow: UnitOfWork
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
     except DuplicateUsernameError:

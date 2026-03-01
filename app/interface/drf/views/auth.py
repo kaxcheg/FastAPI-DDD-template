@@ -70,6 +70,7 @@ class LoginView(APIView):
             refresh_token_hash = refresh_token_service.hash(refresh_token)
 
             async with uow_factory() as uow:
+                uow: UnitOfWork
                 session_repo = uow.get_repo(UserSessionDjangoRepo)
                 user_session = await session_repo.create(
                     user_id=UUID(user_id),
@@ -128,6 +129,7 @@ class RefreshView(APIView):
         refresh_token: str = serializer.validated_data["refresh_token"]
 
         async with uow_factory() as uow:
+            uow: UnitOfWork
             session_repo = uow.get_repo(UserSessionDjangoRepo)
             user_orm, user_session = (
                 await session_repo.get_user_valid_session_by_refresh_token(
@@ -190,6 +192,7 @@ class LogoutView(APIView):
         uow_factory: Callable[[], UnitOfWork] = get_uow_factory()
 
         async with uow_factory() as uow:
+            uow: UnitOfWork
             session_repo = uow.get_repo(UserSessionDjangoRepo)
             revoked = await session_repo.revoke(auth.session_id)
 

@@ -72,6 +72,7 @@ async def login(
         refresh_token_hash = refresh_token_service.hash(refresh_token)
 
         async with uow_factory() as uow:
+            uow: UnitOfWork
             user_session_repo = uow.get_repo(UserSessionORMRepo)
             user_session = await user_session_repo.create(
                 user_id=UUID(user_id),
@@ -154,6 +155,7 @@ async def refresh(
         )
 
     async with uow_factory() as uow:
+        uow: UnitOfWork
         user_session_repo = uow.get_repo(UserSessionORMRepo)
         user_orm, user_session = (
             await user_session_repo.get_user_valid_session_by_refresh_token(
@@ -218,6 +220,7 @@ async def logout(
     auth: AuthPayload = request.state.auth_payload
 
     async with uow_factory() as uow:
+        uow: UnitOfWork
         user_session_repo = uow.get_repo(UserSessionORMRepo)
         revoked = await user_session_repo.revoke(auth.session_id)
 

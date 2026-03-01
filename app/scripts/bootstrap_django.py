@@ -19,6 +19,7 @@ from app.domain.exceptions import DuplicateUsernameError  # noqa: E402
 from app.domain.exceptions.base import DomainError  # noqa: E402
 from app.domain.repositories import UserRepository  # noqa: E402
 from app.domain.value_objects import Username, UserPasswordHash, UserRole  # noqa: E402
+from app.application.ports.uow import UnitOfWork  # noqa: E402
 from app.infrastructure.db.django_orm.adapters.uow import UoWDjango  # noqa: E402
 
 cfg = get_settings()
@@ -53,6 +54,7 @@ async def main() -> int:
 
     try:
         async with uow_factory() as uow:
+            uow: UnitOfWork
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
     except DuplicateUsernameError:
